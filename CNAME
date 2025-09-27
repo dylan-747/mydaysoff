@@ -1,1 +1,4 @@
+mkdir -p public
+cat > public/CNAME << 'EOF'
 mydaysoff.co.uk
+EOF
