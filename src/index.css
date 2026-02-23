@@ -1,3 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.selected-pin-icon {
+  filter: hue-rotate(145deg) saturate(1.8) brightness(0.9);
+}

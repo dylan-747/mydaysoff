@@ -14,6 +14,18 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+const selectedPinIcon = new L.Icon({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  tooltipAnchor: [16, -28],
+  shadowSize: [41, 41],
+  className: "selected-pin-icon",
+});
+
 function heatColor(votes) {
   if (votes >= 20) return "#dc2626";
   if (votes >= 10) return "#ea580c";
@@ -21,7 +33,7 @@ function heatColor(votes) {
   return "#2563eb";
 }
 
-export default function MapView({ events = [], heatMode = false, onBoundsChange, focusEventId, onEventSelect }) {
+export default function MapView({ events = [], heatMode = false, onBoundsChange, focusEventId, selectedEventId, onEventSelect }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -78,14 +90,16 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
     const pts = events.filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lng));
     pts.forEach((e) => {
       const votes = Number(e.likes ?? 0);
+      const isSelected = selectedEventId && e.id === selectedEventId;
 
       if (heatMode) {
+        const color = isSelected ? "#dc2626" : heatColor(votes);
         const marker = L.circleMarker([e.lat, e.lng], {
-          radius: 6 + Math.min(votes, 20) * 0.45,
-          color: heatColor(votes),
-          fillColor: heatColor(votes),
-          fillOpacity: 0.55,
-          weight: 1.5,
+          radius: 6 + Math.min(votes, 20) * 0.45 + (isSelected ? 2 : 0),
+          color,
+          fillColor: color,
+          fillOpacity: isSelected ? 0.8 : 0.55,
+          weight: isSelected ? 2.5 : 1.5,
         })
           .addTo(layer);
         marker.on("click", () => onEventSelect?.(e));
@@ -93,7 +107,9 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
         return;
       }
 
-      const marker = L.marker([e.lat, e.lng]).addTo(layer);
+      const marker = isSelected
+        ? L.marker([e.lat, e.lng], { icon: selectedPinIcon }).addTo(layer)
+        : L.marker([e.lat, e.lng]).addTo(layer);
       marker.on("click", () => onEventSelect?.(e));
       markerByIdRef.current[e.id] = marker;
     });
@@ -106,7 +122,7 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
       map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       didInitialFitRef.current = false;
     }
-  }, [events, heatMode]);
+  }, [events, heatMode, selectedEventId]);
 
   useEffect(() => {
     if (!focusEventId) return;
