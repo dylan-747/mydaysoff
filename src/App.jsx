@@ -245,44 +245,46 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#eef6ff] text-[#14213d]">
-      <header className="relative z-20 bg-white/80 backdrop-blur border-b border-slate-200 md:sticky md:top-0">
-        <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <a href="#/" className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-slate-100 transition">
-              <div className="w-10 h-10 rounded-xl bg-[#ff6a3d]/10 flex items-center justify-center">
-                <IconPin className="w-5 h-5 text-[#ff6a3d]" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold leading-tight">My Days Off</h1>
-                <p className="text-xs text-slate-500 -mt-0.5">Discover what&apos;s on near you</p>
-              </div>
-            </a>
+      <header className="relative z-20">
+        <div className="md:sticky md:top-0 md:z-30 bg-white/85 backdrop-blur border-b border-slate-200">
+          <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <a href="#/" className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-slate-100 transition">
+                <div className="w-10 h-10 rounded-xl bg-[#ff6a3d]/10 flex items-center justify-center">
+                  <IconPin className="w-5 h-5 text-[#ff6a3d]" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold leading-tight">My Days Off</h1>
+                  <p className="text-xs text-slate-500 -mt-0.5">Discover what&apos;s on near you</p>
+                </div>
+              </a>
+            </div>
+            <nav className="flex items-center gap-1 sm:gap-2">
+              <a href="#/about" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                About
+              </a>
+              <a href="#/submit" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                Submit
+              </a>
+              <button
+                onClick={handleSupport}
+                className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
+                title="First month free, then £1/month"
+              >
+                <span className="sm:hidden">Free month</span>
+                <span className="hidden sm:inline">Start free month (£1/mo after)</span>
+              </button>
+              <button
+                onClick={loadEvents}
+                className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 hover:bg-slate-100"
+              >
+                Refresh
+              </button>
+            </nav>
           </div>
-          <nav className="flex items-center gap-1 sm:gap-2">
-            <a href="#/about" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-              About
-            </a>
-            <a href="#/submit" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-              Submit
-            </a>
-            <button
-              onClick={handleSupport}
-              className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
-              title="First month free, then £1/month"
-            >
-              <span className="sm:hidden">Free month</span>
-              <span className="hidden sm:inline">Start free month (£1/mo after)</span>
-            </button>
-            <button
-              onClick={loadEvents}
-              className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 hover:bg-slate-100"
-            >
-              Refresh
-            </button>
-          </nav>
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 pb-3 space-y-2">
+        <div className="mx-auto max-w-7xl px-4 py-3 space-y-2 border-b border-slate-200 bg-white/70">
           <div className="flex flex-wrap items-center gap-2">
             <IconCalendar className="w-4 h-4 text-slate-500" />
             <span className="text-sm font-medium">Date:</span>
@@ -315,8 +317,8 @@ export default function App() {
               Sort by <IconFlame className="w-4 h-4 text-orange-500" />
             </label>
           </div>
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 pb-1">
+          <div className="overflow-x-auto overscroll-x-contain touch-pan-x" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div className="flex gap-2 pb-1 min-w-max">
               {days.map((d, i) => {
                 const isToday = i === 0;
                 const labelTop = isToday ? "Today" : d.toLocaleDateString(undefined, { weekday: "short" });
@@ -368,6 +370,92 @@ export default function App() {
             />
           </div>
         </section>
+
+        {selectedEvent && (
+          <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold">{selectedEvent.name}</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  {selectedEvent.start_date}
+                  {selectedEvent.time ? ` • ${selectedEvent.time}` : ""}
+                  {selectedEvent.venue ? ` • ${selectedEvent.venue}` : ""}
+                </p>
+              </div>
+              <button
+                className="rounded-xl border border-slate-200 px-3 py-1 text-sm hover:bg-slate-50"
+                onClick={() => setSelectedEvent(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            {selectedEvent.summary && <p className="mt-3 text-sm text-slate-700">{selectedEvent.summary}</p>}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {formatIndoor(selectedEvent.indoor) && (
+                <span className="text-xs rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1">{formatIndoor(selectedEvent.indoor)}</span>
+              )}
+              {formatLevel(selectedEvent.activity_level) && (
+                <span className="text-xs rounded-full bg-amber-50 text-amber-700 px-2.5 py-1">{formatLevel(selectedEvent.activity_level)}</span>
+              )}
+              {selectedEvent.vibe && (
+                <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1">✨ {selectedEvent.vibe}</span>
+              )}
+              {selectedEvent.source_trust && (
+                <span className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1">Source: {selectedEvent.source_trust}</span>
+              )}
+              <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2.5 py-1">
+                🔎 {verificationLabel(selectedEvent.verification_status)}
+              </span>
+              {(selectedEvent.accessibility || []).map((tag) => (
+                <span key={`inline-${selectedEvent.id}-${tag}`} className="text-xs rounded-full bg-lime-50 text-lime-700 px-2.5 py-1">
+                  ♿ {tag}
+                </span>
+              ))}
+              {formatAudience(selectedEvent.audience) && (
+                <span className="text-xs rounded-full bg-sky-50 text-sky-700 px-2.5 py-1">{formatAudience(selectedEvent.audience)}</span>
+              )}
+            </div>
+
+            <div className="mt-4 text-sm text-slate-700 space-y-1">
+              {selectedEvent.planning?.public_transport && <p>🚆 {selectedEvent.planning.public_transport}</p>}
+              {selectedEvent.planning?.bring_with_you && <p>🎒 {selectedEvent.planning.bring_with_you}</p>}
+              {typeof selectedEvent.planning?.booking_required === "boolean" && (
+                <p>{selectedEvent.planning.booking_required ? "🧾 Booking required" : "✅ Walk-ins welcome"}</p>
+              )}
+              {selectedEvent.what3words && <p>📍 ///{selectedEvent.what3words}</p>}
+              {selectedEvent.source_event_url && (
+                <p>
+                  🧷 Source listing:{" "}
+                  <a className="underline" href={selectedEvent.source_event_url} target="_blank" rel="noopener noreferrer">
+                    open
+                  </a>
+                </p>
+              )}
+              {selectedEvent.source_feed_url && <p>📰 Feed: {selectedEvent.source_feed_url}</p>}
+              {selectedEvent.last_seen_at && <p>🕒 Last checked: {new Date(selectedEvent.last_seen_at).toLocaleString()}</p>}
+            </div>
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                onClick={() => toggleLike(selectedEvent.id)}
+                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-orange-50"
+              >
+                <IconFlame className="w-4 h-4 text-orange-500" />
+                Fire {selectedEvent.likes || 0}
+              </button>
+              <a
+                href={selectedEvent.source_event_url || selectedEvent.url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+              >
+                <IconExternal className="w-4 h-4" /> More details
+              </a>
+            </div>
+          </section>
+        )}
 
         <aside className="rounded-3xl bg-white border border-slate-200 shadow-sm p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
@@ -469,97 +557,6 @@ export default function App() {
           </div>
         </aside>
       </main>
-
-      {selectedEvent && (
-        <div className="fixed inset-0 z-[1200] bg-slate-900/40 backdrop-blur-[1px] p-4" onClick={() => setSelectedEvent(null)}>
-          <div
-            className="mx-auto mt-8 max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-xl p-5"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold">{selectedEvent.name}</h3>
-                <p className="text-sm text-slate-600 mt-1">
-                  {selectedEvent.start_date}
-                  {selectedEvent.time ? ` • ${selectedEvent.time}` : ""}
-                  {selectedEvent.venue ? ` • ${selectedEvent.venue}` : ""}
-                </p>
-              </div>
-              <button
-                className="rounded-xl border border-slate-200 px-3 py-1 text-sm hover:bg-slate-50"
-                onClick={() => setSelectedEvent(null)}
-              >
-                Close
-              </button>
-            </div>
-
-            {selectedEvent.summary && <p className="mt-3 text-sm text-slate-700">{selectedEvent.summary}</p>}
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {formatIndoor(selectedEvent.indoor) && (
-                <span className="text-xs rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1">{formatIndoor(selectedEvent.indoor)}</span>
-              )}
-              {formatLevel(selectedEvent.activity_level) && (
-                <span className="text-xs rounded-full bg-amber-50 text-amber-700 px-2.5 py-1">{formatLevel(selectedEvent.activity_level)}</span>
-              )}
-              {selectedEvent.vibe && (
-                <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1">✨ {selectedEvent.vibe}</span>
-              )}
-              {selectedEvent.source_trust && (
-                <span className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1">Source: {selectedEvent.source_trust}</span>
-              )}
-              <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2.5 py-1">
-                🔎 {verificationLabel(selectedEvent.verification_status)}
-              </span>
-              {(selectedEvent.accessibility || []).map((tag) => (
-                <span key={`modal-${selectedEvent.id}-${tag}`} className="text-xs rounded-full bg-lime-50 text-lime-700 px-2.5 py-1">
-                  ♿ {tag}
-                </span>
-              ))}
-              {formatAudience(selectedEvent.audience) && (
-                <span className="text-xs rounded-full bg-sky-50 text-sky-700 px-2.5 py-1">{formatAudience(selectedEvent.audience)}</span>
-              )}
-            </div>
-
-            <div className="mt-4 text-sm text-slate-700 space-y-1">
-              {selectedEvent.planning?.public_transport && <p>🚆 {selectedEvent.planning.public_transport}</p>}
-              {selectedEvent.planning?.bring_with_you && <p>🎒 {selectedEvent.planning.bring_with_you}</p>}
-              {typeof selectedEvent.planning?.booking_required === "boolean" && (
-                <p>{selectedEvent.planning.booking_required ? "🧾 Booking required" : "✅ Walk-ins welcome"}</p>
-              )}
-              {selectedEvent.what3words && <p>📍 ///{selectedEvent.what3words}</p>}
-              {selectedEvent.source_event_url && (
-                <p>
-                  🧷 Source listing:{" "}
-                  <a className="underline" href={selectedEvent.source_event_url} target="_blank" rel="noopener noreferrer">
-                    open
-                  </a>
-                </p>
-              )}
-              {selectedEvent.source_feed_url && <p>📰 Feed: {selectedEvent.source_feed_url}</p>}
-              {selectedEvent.last_seen_at && <p>🕒 Last checked: {new Date(selectedEvent.last_seen_at).toLocaleString()}</p>}
-            </div>
-
-            <div className="mt-5 flex items-center gap-2">
-              <button
-                onClick={() => toggleLike(selectedEvent.id)}
-                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-orange-50"
-              >
-                <IconFlame className="w-4 h-4 text-orange-500" />
-                Fire {selectedEvent.likes || 0}
-              </button>
-              <a
-                href={selectedEvent.source_event_url || selectedEvent.url || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
-              >
-                <IconExternal className="w-4 h-4" /> More details
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
 
       <footer className="px-4 py-6">
         <div className="mx-auto max-w-7xl text-xs text-slate-500">© My Days Off - Community powered</div>
