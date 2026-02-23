@@ -190,7 +190,6 @@ export default function About() {
               Explore events
             </a>
           </div>
-          <p className="mt-3 text-xs text-white/75">No paid ranking. No downvotes.</p>
         </section>
       </main>
     </div>
