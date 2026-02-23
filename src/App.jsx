@@ -239,13 +239,13 @@ export default function App() {
       const data = await createCheckout(window.location.origin);
       if (data.checkoutUrl) window.location.href = data.checkoutUrl;
     } catch (err) {
-      setError("Support checkout is coming soon (Stripe keys not connected yet).");
+      setError("Subscription checkout is not connected yet. Set Stripe keys in the API env.");
     }
   }
 
   return (
     <div className="min-h-screen bg-[#eef6ff] text-[#14213d]">
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-slate-200">
+      <header className="relative z-20 bg-white/80 backdrop-blur border-b border-slate-200 md:sticky md:top-0">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <a href="#/" className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-slate-100 transition">
@@ -265,14 +265,12 @@ export default function App() {
             <a href="#/submit" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
               Submit
             </a>
-            <a href="#/admin" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-              Admin
-            </a>
             <button
               onClick={handleSupport}
               className="rounded-xl px-3 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95"
+              title="First month free, then £1/month"
             >
-              Support £1
+              Start free month (£1/mo after)
             </button>
             <button
               onClick={loadEvents}
@@ -351,8 +349,8 @@ export default function App() {
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-4 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
-        <section className="relative rounded-3xl bg-white border border-slate-200 shadow-sm min-h-[340px] lg:min-h-[560px]">
+      <main className="mx-auto max-w-7xl px-4 py-4 space-y-4">
+        <section className="relative rounded-3xl bg-white border border-slate-200 shadow-sm min-h-[360px] lg:min-h-[62vh]">
           <div className="absolute top-3 left-3 inline-flex items-center gap-2 rounded-xl bg-white/90 border border-slate-200 px-3 py-1 text-xs shadow-sm z-[1000]">
             <IconPin className="w-4 h-4 text-[#ff6a3d]" />
             <span>
@@ -370,7 +368,7 @@ export default function App() {
           </div>
         </section>
 
-        <aside className="rounded-3xl bg-white border border-slate-200 shadow-sm p-3 lg:p-4 max-h-[70vh] overflow-auto">
+        <aside className="rounded-3xl bg-white border border-slate-200 shadow-sm p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold tracking-wide">Events</h2>
             <span className="text-xs text-slate-500">{listEvents.length} shown</span>

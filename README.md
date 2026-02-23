@@ -62,10 +62,11 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - `PATCH /api/admin/events/:id/status` (admin approve/reject)
 - `POST /api/admin/ingest` (admin import curated source events)
 - `POST /api/geocode/what3words` (needs `WHAT3WORDS_API_KEY`)
-- `POST /api/stripe/checkout` (needs Stripe env keys)
+- `POST /api/stripe/checkout` (needs Stripe env keys, includes trial support)
 
 ## Notes
 
 - Votes are fire-only and cumulative.
 - Submissions stay hidden until approved.
 - what3words and Stripe are env-key gated and ready to wire.
+- Stripe checkout creates a subscription with `STRIPE_TRIAL_DAYS` free (default `30`), then bills your `STRIPE_PRICE_ID`.

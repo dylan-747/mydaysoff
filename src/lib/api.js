@@ -66,6 +66,14 @@ export function setEventStatus(id, status, adminToken) {
   });
 }
 
+export function updateAdminEvent(id, payload, adminToken) {
+  return request(`/api/admin/events/${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-token": adminToken },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function ingestPopular(adminToken) {
   return request("/api/admin/ingest", {
     method: "POST",

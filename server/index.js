@@ -10,6 +10,7 @@ const app = express();
 const port = Number(process.env.PORT || 8787);
 const adminToken = process.env.ADMIN_TOKEN || "dev-admin-token";
 const refreshMs = Number(process.env.INGEST_REFRESH_MS || 15 * 60 * 1000);
+const stripeTrialDays = Number(process.env.STRIPE_TRIAL_DAYS || 30);
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -229,6 +230,17 @@ function requireAdmin(req, res, next) {
   return next();
 }
 
+function toList(input) {
+  if (Array.isArray(input)) return input;
+  if (typeof input === "string") {
+    return input
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 app.get("/api/admin/submissions", requireAdmin, (_req, res) => {
   const rows = db
     .prepare(
@@ -254,6 +266,58 @@ app.patch("/api/admin/events/:id/status", requireAdmin, (req, res) => {
   if (result.changes === 0) return res.status(404).json({ error: "event not found" });
 
   return res.json({ ok: true, id: req.params.id, status });
+});
+
+app.patch("/api/admin/events/:id", requireAdmin, (req, res) => {
+  const id = req.params.id;
+  const existing = db.prepare("SELECT * FROM events WHERE id = ?").get(id);
+  if (!existing) return res.status(404).json({ error: "event not found" });
+
+  const base = formatEvent({ ...existing, votes: 0 });
+  const payload = req.body || {};
+
+  const merged = {
+    ...base,
+    ...payload,
+    id,
+    category: payload.category ? toList(payload.category) : base.category,
+    accessibility: payload.accessibility ? toList(payload.accessibility) : base.accessibility,
+    audience: payload.audience ? toList(payload.audience) : base.audience,
+    planning: {
+      ...(base.planning || {}),
+      ...(payload.planning || {}),
+    },
+    source: base.source,
+    source_trust: base.source_trust,
+    source_event_id: base.source_event_id,
+    source_event_url: payload.source_event_url ?? base.source_event_url,
+    source_feed_url: base.source_feed_url,
+    verification_status: base.verification_status,
+    evidence: base.evidence,
+    first_seen_at: base.first_seen_at,
+    last_seen_at: new Date().toISOString(),
+    status: base.status,
+  };
+
+  const row = toEventRow(merged);
+  if (!Number.isFinite(row.lat) || !Number.isFinite(row.lng)) {
+    return res.status(400).json({ error: "lat/lng must be numbers" });
+  }
+
+  insertEvent.run(row);
+  ensureVoteRow.run(id);
+  const updated = db
+    .prepare(
+      `
+      SELECT e.*, COALESCE(v.count, 0) AS votes
+      FROM events e
+      LEFT JOIN votes v ON v.event_id = e.id
+      WHERE e.id = ?
+      `,
+    )
+    .get(id);
+
+  return res.json({ ok: true, event: formatEvent(updated) });
 });
 
 app.post("/api/admin/ingest", requireAdmin, async (_req, res) => {
@@ -309,6 +373,9 @@ app.post("/api/stripe/checkout", async (req, res) => {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
+    subscription_data: {
+      trial_period_days: stripeTrialDays,
+    },
     success_url: `${origin}/#/`,
     cancel_url: `${origin}/#/`,
   });
