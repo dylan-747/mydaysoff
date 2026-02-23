@@ -54,6 +54,17 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(event_id) REFERENCES events(id)
   );
+
+  CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    city TEXT,
+    interests_json TEXT NOT NULL DEFAULT '[]',
+    source TEXT NOT NULL DEFAULT 'site-modal',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 function ensureColumn(tableName, columnName, columnType) {

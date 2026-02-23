@@ -87,7 +87,7 @@ export default function About() {
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6">
-          <h2 className="text-2xl font-bold">Community powered events.</h2>
+          <h2 className="text-2xl font-bold">Find what is actually worth your time.</h2>
           <p className="mt-3 text-slate-700 leading-relaxed">
             My Days Off is a map-based event browser for UK events. It combines curated source data and moderated
             community submissions so you can see what is happening by date and location.

@@ -217,6 +217,23 @@ const ensureVoteRowWithPopularity = db.prepare(`
   ON CONFLICT(event_id) DO NOTHING
 `);
 
+const upsertNewsletterSubscriber = db.prepare(`
+  INSERT INTO newsletter_subscribers (email, city, interests_json, source, status, updated_at)
+  VALUES (@email, @city, @interests_json, @source, 'active', CURRENT_TIMESTAMP)
+  ON CONFLICT(email) DO UPDATE SET
+    city = excluded.city,
+    interests_json = excluded.interests_json,
+    source = excluded.source,
+    status = 'active',
+    updated_at = CURRENT_TIMESTAMP
+`);
+
+const unsubscribeNewsletterSubscriber = db.prepare(`
+  UPDATE newsletter_subscribers
+  SET status = 'unsubscribed', updated_at = CURRENT_TIMESTAMP
+  WHERE email = ?
+`);
+
 async function ingestCuratedEvents() {
   const incoming = await getCuratedEvents();
   if (!incoming.length) {
@@ -296,6 +313,34 @@ app.post("/api/events/:id/vote", (req, res) => {
 
   const row = db.prepare("SELECT count FROM votes WHERE event_id = ?").get(id);
   return res.json({ ok: true, id, likes: Number(row.count || 0) });
+});
+
+app.post("/api/newsletter/signup", (req, res) => {
+  const payload = req.body || {};
+  const email = cleanText(payload.email || "").toLowerCase();
+  const city = cleanText(payload.city || "");
+  const interests = asTagList(payload.interests).slice(0, 6);
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "valid email is required" });
+  }
+
+  upsertNewsletterSubscriber.run({
+    email,
+    city,
+    interests_json: JSON.stringify(interests),
+    source: "site-modal",
+  });
+
+  return res.status(201).json({ ok: true, email });
+});
+
+app.post("/api/newsletter/unsubscribe", (req, res) => {
+  const email = cleanText(req.body?.email || "").toLowerCase();
+  if (!email) return res.status(400).json({ error: "email is required" });
+
+  unsubscribeNewsletterSubscriber.run(email);
+  return res.json({ ok: true, email });
 });
 
 function requireAdmin(req, res, next) {

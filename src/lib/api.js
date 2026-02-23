@@ -81,4 +81,11 @@ export function ingestPopular(adminToken) {
   });
 }
 
+export function signupNewsletter(payload) {
+  return request("/api/newsletter/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export { API_BASE };

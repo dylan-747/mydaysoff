@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import MapView from "./MapView.jsx";
-import { createCheckout, getEvents, voteEvent } from "./lib/api.js";
+import { getEvents, signupNewsletter, voteEvent } from "./lib/api.js";
 const todayYmd = new Date().toISOString().slice(0, 10);
 const fallbackEvents = [
   {
@@ -129,6 +129,8 @@ const COSTS = [
   { value: "donation", label: "Donation" },
 ];
 
+const NEWSLETTER_INTERESTS = ["family", "outdoors", "market", "sports", "music", "charity", "wellbeing"];
+
 function addDays(d, n) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
@@ -191,6 +193,14 @@ export default function App() {
   const [mapBounds, setMapBounds] = useState(null);
   const [focusedEventId, setFocusedEventId] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [newsletterOpen, setNewsletterOpen] = useState(false);
+  const [newsletterStatus, setNewsletterStatus] = useState("");
+  const [newsletterBusy, setNewsletterBusy] = useState(false);
+  const [newsletterForm, setNewsletterForm] = useState({
+    email: "",
+    city: "",
+    interests: [],
+  });
 
   const days = useMemo(
     () => Array.from({ length: rangeDays + 1 }, (_, i) => addDays(today, i)),
@@ -271,12 +281,41 @@ export default function App() {
     }
   }
 
-  async function handleSupport() {
+  function openNewsletter() {
+    setNewsletterStatus("");
+    setNewsletterOpen(true);
+  }
+
+  function toggleInterest(interest) {
+    setNewsletterForm((prev) => {
+      const current = new Set(prev.interests);
+      if (current.has(interest)) current.delete(interest);
+      else current.add(interest);
+      return { ...prev, interests: Array.from(current) };
+    });
+  }
+
+  async function submitNewsletter(event) {
+    event.preventDefault();
+    const email = newsletterForm.email.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      setNewsletterStatus("Please add a valid email.");
+      return;
+    }
+
+    setNewsletterBusy(true);
     try {
-      const data = await createCheckout(window.location.origin);
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+      await signupNewsletter({
+        email,
+        city: newsletterForm.city.trim(),
+        interests: newsletterForm.interests,
+      });
+      setNewsletterStatus("Joined. You’re on the weekly local picks list.");
+      setNewsletterForm({ email: "", city: "", interests: [] });
     } catch (err) {
-      setError("Subscription checkout is not connected yet. Set Stripe keys in the API env.");
+      setNewsletterStatus(err.message || "Could not save right now. Try again.");
+    } finally {
+      setNewsletterBusy(false);
     }
   }
 
@@ -317,12 +356,12 @@ export default function App() {
                 Submit
               </a>
             <button
-              onClick={handleSupport}
+              onClick={openNewsletter}
               className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
-              title="Become a local insider. First month free, then £1/month."
+              title="Join weekly local picks"
             >
-              <span className="sm:hidden">Insider</span>
-              <span className="hidden sm:inline">Become a local insider</span>
+              <span className="sm:hidden">Weekly picks</span>
+              <span className="hidden sm:inline">Get weekly local picks</span>
             </button>
           </nav>
         </div>
@@ -628,8 +667,99 @@ export default function App() {
       </main>
 
       <footer className="px-4 py-6">
-        <div className="mx-auto max-w-7xl text-xs text-slate-500">© My Days Off - Community powered</div>
+        <div className="mx-auto max-w-7xl text-xs text-slate-500 flex items-center gap-2">
+          <span>© My Days Off - Community powered</span>
+          <span>•</span>
+          <a href="#/privacy" className="underline">
+            Privacy
+          </a>
+        </div>
       </footer>
+
+      {newsletterOpen && (
+        <div className="fixed inset-0 z-[1400] bg-slate-900/35 p-4" onClick={() => setNewsletterOpen(false)}>
+          <div
+            className="mx-auto mt-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold">Weekly local picks</h3>
+                <p className="mt-1 text-sm text-slate-600">A short weekly roundup based on your city and interests.</p>
+              </div>
+              <button
+                onClick={() => setNewsletterOpen(false)}
+                className="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="mt-4 space-y-3" onSubmit={submitNewsletter}>
+              <label className="block text-sm">
+                Email
+                <input
+                  type="email"
+                  value={newsletterForm.email}
+                  onChange={(event) => setNewsletterForm((prev) => ({ ...prev, email: event.target.value }))}
+                  placeholder="you@example.com"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  required
+                />
+              </label>
+
+              <label className="block text-sm">
+                City (optional)
+                <input
+                  value={newsletterForm.city}
+                  onChange={(event) => setNewsletterForm((prev) => ({ ...prev, city: event.target.value }))}
+                  placeholder="Glasgow"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+              </label>
+
+              <div>
+                <p className="text-sm">Interests (optional)</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {NEWSLETTER_INTERESTS.map((interest) => {
+                    const active = newsletterForm.interests.includes(interest);
+                    return (
+                      <button
+                        key={interest}
+                        type="button"
+                        onClick={() => toggleInterest(interest)}
+                        className={`rounded-full border px-2.5 py-1 text-xs lowercase ${
+                          active ? "border-[#ff6a3d] bg-[#ff6a3d]/12 text-[#ff6a3d]" : "border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={newsletterBusy}
+                className="w-full rounded-xl bg-[#ff6a3d] px-3 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {newsletterBusy ? "Joining..." : "Join list"}
+              </button>
+
+              <p className="text-xs text-slate-500">
+                One concise email per week. Unsubscribe any time. Read our{" "}
+                <a href="#/privacy" className="underline">
+                  Privacy Policy
+                </a>
+                .
+              </p>
+              {newsletterStatus && <p className="text-sm text-slate-700">{newsletterStatus}</p>}
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
