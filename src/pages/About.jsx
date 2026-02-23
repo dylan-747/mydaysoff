@@ -18,7 +18,6 @@ export default function About() {
           <nav className="flex items-center gap-2">
             <a href="#/" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">Home</a>
             <a href="#/submit" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">Submit</a>
-            <a href="#/admin" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">Admin</a>
           </nav>
         </div>
       </header>
