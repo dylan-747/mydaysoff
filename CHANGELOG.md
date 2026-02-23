@@ -9,6 +9,7 @@ All notable changes to this project are tracked here.
 
 ### Changed
 - Pricing CTA updated to "Start free month (£1/mo after)".
+- About page copy updated to an informational tone while keeping the existing card layout.
 
 ### Fixed
 - About page restored to original beta copy while keeping admin navigation hidden from public nav.
