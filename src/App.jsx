@@ -153,24 +153,24 @@ function inBounds(event, bounds) {
 }
 
 function formatIndoor(indoor) {
-  if (indoor === "indoor") return "🏠 Indoor";
-  if (indoor === "outdoor") return "🌳 Outdoor";
-  if (indoor === "mixed") return "🏠🌳 Mixed";
+  if (indoor === "indoor") return "🏠 indoor";
+  if (indoor === "outdoor") return "🌳 outdoor";
+  if (indoor === "mixed") return "🏠🌳 mixed";
   return "";
 }
 
 function formatLevel(level) {
   if (!level) return "";
-  if (level === "low") return "🧘 Low effort";
-  if (level === "medium") return "🚶 Medium effort";
-  if (level === "high") return "🏃 Higher effort";
+  if (level === "low") return "🧘 low effort";
+  if (level === "medium") return "🚶 medium effort";
+  if (level === "high") return "🏃 high effort";
   return level;
 }
 
 function formatAudience(audience) {
   if (!audience?.length) return "";
-  if (audience.includes("all-ages")) return "👨‍👩‍👧‍👦 All ages";
-  return `🧑 Good for ${audience.join(", ")}`;
+  if (audience.includes("all-ages")) return "👨‍👩‍👧‍👦 all ages";
+  return `🧑 good for ${audience.join(", ")}`;
 }
 
 function verificationLabel(status) {
@@ -316,14 +316,14 @@ export default function App() {
               <a href="#/submit" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
                 Submit
               </a>
-              <button
-                onClick={handleSupport}
-                className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
-                title="First month free, then £1/month"
-              >
-                <span className="sm:hidden">Free month</span>
-                <span className="hidden sm:inline">Start free month (£1/mo after)</span>
-              </button>
+            <button
+              onClick={handleSupport}
+              className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
+              title="Become a local insider. First month free, then £1/month."
+            >
+              <span className="sm:hidden">Insider</span>
+              <span className="hidden sm:inline">Become a local insider</span>
+            </button>
               <button
                 onClick={loadEvents}
                 className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 hover:bg-slate-100"
@@ -423,7 +423,8 @@ export default function App() {
         </section>
 
         {selectedEvent && (
-          <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
+          <section className="relative overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff6a3d] via-[#ff8c6b] to-[#ff6a3d]" />
             <div className="flex items-start justify-between gap-3">
               <button
                 onClick={() => moveSelectedEvent(-1)}
@@ -455,10 +456,11 @@ export default function App() {
               </button>
 
               <button
-                className="rounded-xl border border-slate-200 px-3 py-1 text-sm hover:bg-slate-50"
+                className="h-9 w-9 shrink-0 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
                 onClick={() => setSelectedEvent(null)}
+                aria-label="Close details"
               >
-                Close
+                ×
               </button>
             </div>
 
@@ -466,27 +468,27 @@ export default function App() {
 
             <div className="mt-4 flex flex-wrap gap-2">
               {formatIndoor(selectedEvent.indoor) && (
-                <span className="text-xs rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1">{formatIndoor(selectedEvent.indoor)}</span>
+                <span className="text-xs rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 lowercase">{formatIndoor(selectedEvent.indoor)}</span>
               )}
               {formatLevel(selectedEvent.activity_level) && (
-                <span className="text-xs rounded-full bg-amber-50 text-amber-700 px-2.5 py-1">{formatLevel(selectedEvent.activity_level)}</span>
+                <span className="text-xs rounded-full bg-amber-50 text-amber-700 px-2.5 py-1 lowercase">{formatLevel(selectedEvent.activity_level)}</span>
               )}
               {selectedEvent.vibe && (
-                <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1">✨ {selectedEvent.vibe}</span>
+                <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1 lowercase">✨ {selectedEvent.vibe}</span>
               )}
               {selectedEvent.source_trust && (
-                <span className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1">Source: {selectedEvent.source_trust}</span>
+                <span className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 lowercase">source: {selectedEvent.source_trust}</span>
               )}
-              <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2.5 py-1">
+              <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2.5 py-1 lowercase">
                 🔎 {verificationLabel(selectedEvent.verification_status)}
               </span>
               {(selectedEvent.accessibility || []).map((tag) => (
-                <span key={`inline-${selectedEvent.id}-${tag}`} className="text-xs rounded-full bg-lime-50 text-lime-700 px-2.5 py-1">
+                <span key={`inline-${selectedEvent.id}-${tag}`} className="text-xs rounded-full bg-lime-50 text-lime-700 px-2.5 py-1 lowercase">
                   ♿ {tag}
                 </span>
               ))}
               {formatAudience(selectedEvent.audience) && (
-                <span className="text-xs rounded-full bg-sky-50 text-sky-700 px-2.5 py-1">{formatAudience(selectedEvent.audience)}</span>
+                <span className="text-xs rounded-full bg-sky-50 text-sky-700 px-2.5 py-1 lowercase">{formatAudience(selectedEvent.audience)}</span>
               )}
             </div>
 
@@ -512,18 +514,19 @@ export default function App() {
             <div className="mt-5 flex items-center gap-2">
               <button
                 onClick={() => toggleLike(selectedEvent.id)}
-                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-orange-50"
+                aria-label="Add fire vote"
+                className="inline-flex items-center gap-1 rounded-full border border-[#ff6a3d]/30 bg-[#ff6a3d]/12 px-3 py-2 text-sm font-semibold text-[#ff6a3d] hover:bg-[#ff6a3d]/20"
               >
-                <IconFlame className="w-4 h-4 text-orange-500" />
-                Fire {selectedEvent.likes || 0}
+                <IconFlame className="w-4 h-4 text-[#ff6a3d]" />
+                <span className="tabular-nums">{selectedEvent.likes || 0}</span>
               </button>
               <a
                 href={selectedEvent.source_event_url || selectedEvent.url || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
               >
-                <IconExternal className="w-4 h-4" /> More details
+                <IconExternal className="w-4 h-4" /> Details
               </a>
             </div>
           </section>
@@ -565,30 +568,30 @@ export default function App() {
                     </div>
                     {e.summary && <p className="mt-1 text-xs text-slate-600">{e.summary}</p>}
                     <div className="mt-2 flex flex-wrap gap-1">
-                      <span className="text-[10px] rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5">{e.city}</span>
+                      <span className="text-[10px] rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 lowercase">{e.city}</span>
                       {(e.category || []).map((c) => (
-                        <span key={c} className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">
+                        <span key={c} className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
                           {c}
                         </span>
                       ))}
                       {formatIndoor(e.indoor) && (
-                        <span className="text-[10px] rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5">{formatIndoor(e.indoor)}</span>
+                        <span className="text-[10px] rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 lowercase">{formatIndoor(e.indoor)}</span>
                       )}
                       {formatLevel(e.activity_level) && (
-                        <span className="text-[10px] rounded-full bg-amber-50 text-amber-700 px-2 py-0.5">{formatLevel(e.activity_level)}</span>
+                        <span className="text-[10px] rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 lowercase">{formatLevel(e.activity_level)}</span>
                       )}
-                      {e.vibe && <span className="text-[10px] rounded-full bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5">✨ {e.vibe}</span>}
-                      <span className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">
+                      {e.vibe && <span className="text-[10px] rounded-full bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 lowercase">✨ {e.vibe}</span>}
+                      <span className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
                         🔎 {verificationLabel(e.verification_status)}
                       </span>
                       {e.source && (
-                        <span className="text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5">Source: {e.source}</span>
+                        <span className="text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 lowercase">source: {e.source}</span>
                       )}
                       {formatAudience(e.audience) && (
-                        <span className="text-[10px] rounded-full bg-sky-50 text-sky-700 px-2 py-0.5">{formatAudience(e.audience)}</span>
+                        <span className="text-[10px] rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 lowercase">{formatAudience(e.audience)}</span>
                       )}
                       {(e.accessibility || []).slice(0, 2).map((tag) => (
-                        <span key={`${e.id}-${tag}`} className="text-[10px] rounded-full bg-lime-50 text-lime-700 px-2 py-0.5">
+                        <span key={`${e.id}-${tag}`} className="text-[10px] rounded-full bg-lime-50 text-lime-700 px-2 py-0.5 lowercase">
                           ♿ {tag}
                         </span>
                       ))}

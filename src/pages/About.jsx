@@ -172,21 +172,25 @@ export default function About() {
         </section>
 
         <section className="rounded-3xl bg-[#14213d] text-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold">Supporter plan</h3>
+          <h3 className="text-xl font-semibold">Become a local insider</h3>
           <p className="mt-2 text-sm text-white/90">
             First month free. Then £1/month. Supports feed quality, moderation, and ongoing improvements.
+          </p>
+          <p className="mt-2 text-xs text-white/75">
+            Live now: {stats.weekly} events this week across {stats.cities} cities.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={handleStartTrial}
               className="rounded-xl px-3 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm hover:brightness-95"
             >
-              Start free month
+              Become a local insider
             </button>
             <a href="#/" className="rounded-xl px-3 py-2 text-sm font-semibold border border-white/30 hover:bg-white/10">
               Explore events
             </a>
           </div>
+          <p className="mt-3 text-xs text-white/75">No paid ranking. No downvotes.</p>
         </section>
       </main>
     </div>
