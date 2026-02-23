@@ -1,0 +1,26 @@
+[
+  {
+    "id": "nhs-england-events",
+    "name": "NHS England Events",
+    "type": "rss",
+    "url": "https://www.england.nhs.uk/events/feed/",
+    "trust": "official",
+    "categoryHint": ["wellbeing", "charity"]
+  },
+  {
+    "id": "manchester-library-events",
+    "name": "Manchester Libraries Events",
+    "type": "rss",
+    "url": "https://www.manchester.gov.uk/events/rss",
+    "trust": "official",
+    "categoryHint": ["family", "wellbeing"]
+  },
+  {
+    "id": "eventbrite-london",
+    "name": "Eventbrite London",
+    "type": "rss",
+    "url": "https://www.eventbrite.com/d/united-kingdom--london/events--this-weekend/rss/",
+    "trust": "trusted-partner",
+    "categoryHint": ["market", "music", "family"]
+  }
+]

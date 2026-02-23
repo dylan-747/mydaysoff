@@ -1,0 +1,347 @@
+import "dotenv/config";
+import crypto from "node:crypto";
+import express from "express";
+import cors from "cors";
+import Stripe from "stripe";
+import db from "./db.js";
+import { getCuratedEvents } from "./adapters/aggregateEvents.js";
+
+const app = express();
+const port = Number(process.env.PORT || 8787);
+const adminToken = process.env.ADMIN_TOKEN || "dev-admin-token";
+const refreshMs = Number(process.env.INGEST_REFRESH_MS || 15 * 60 * 1000);
+
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+
+function toEventRow(input) {
+  return {
+    id: input.id,
+    name: input.name,
+    start_date: input.start_date,
+    end_date: input.end_date || input.start_date,
+    time: input.time || "",
+    category_json: JSON.stringify(input.category || []),
+    cost: input.cost || "free",
+    venue: input.venue || "",
+    city: input.city || "Edinburgh",
+    url: input.url || "#",
+    what3words: input.what3words || "",
+    summary: input.summary || "",
+    accessibility_json: JSON.stringify(input.accessibility || []),
+    audience_json: JSON.stringify(input.audience || []),
+    indoor: input.indoor || "",
+    activity_level: input.activity_level || "",
+    vibe: input.vibe || "",
+    planning_json: JSON.stringify(input.planning || {}),
+    source_trust: input.source_trust || "trusted-partner",
+    source_event_id: input.source_event_id || "",
+    source_event_url: input.source_event_url || input.url || "",
+    source_feed_url: input.source_feed_url || "",
+    verification_status: input.verification_status || "community-submitted",
+    evidence_json: JSON.stringify(input.evidence || {}),
+    first_seen_at: input.first_seen_at || new Date().toISOString(),
+    last_seen_at: input.last_seen_at || new Date().toISOString(),
+    lat: Number(input.lat ?? 55.9533),
+    lng: Number(input.lng ?? -3.1883),
+    status: input.status || "pending",
+    source: input.source || "user",
+  };
+}
+
+function formatEvent(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    time: row.time,
+    category: JSON.parse(row.category_json || "[]"),
+    cost: row.cost,
+    venue: row.venue,
+    city: row.city,
+    url: row.url,
+    what3words: row.what3words,
+    summary: row.summary || "",
+    accessibility: JSON.parse(row.accessibility_json || "[]"),
+    audience: JSON.parse(row.audience_json || "[]"),
+    indoor: row.indoor || "",
+    activity_level: row.activity_level || "",
+    vibe: row.vibe || "",
+    planning: JSON.parse(row.planning_json || "{}"),
+    source_trust: row.source_trust || "trusted-partner",
+    source_event_id: row.source_event_id || "",
+    source_event_url: row.source_event_url || row.url || "",
+    source_feed_url: row.source_feed_url || "",
+    verification_status: row.verification_status || "community-submitted",
+    evidence: JSON.parse(row.evidence_json || "{}"),
+    first_seen_at: row.first_seen_at || "",
+    last_seen_at: row.last_seen_at || "",
+    lat: Number(row.lat),
+    lng: Number(row.lng),
+    likes: Number(row.votes || 0),
+    status: row.status,
+    source: row.source,
+  };
+}
+
+const insertEvent = db.prepare(`
+  INSERT INTO events (
+    id, name, start_date, end_date, time, category_json, cost, venue,
+    city, url, what3words, summary, accessibility_json, audience_json, indoor,
+    activity_level, vibe, planning_json, source_trust, source_event_id, source_event_url,
+    source_feed_url, verification_status, evidence_json, first_seen_at, last_seen_at,
+    lat, lng, status, source
+  ) VALUES (
+    @id, @name, @start_date, @end_date, @time, @category_json, @cost, @venue,
+    @city, @url, @what3words, @summary, @accessibility_json, @audience_json, @indoor,
+    @activity_level, @vibe, @planning_json, @source_trust, @source_event_id, @source_event_url,
+    @source_feed_url, @verification_status, @evidence_json, @first_seen_at, @last_seen_at,
+    @lat, @lng, @status, @source
+  )
+  ON CONFLICT(id) DO UPDATE SET
+    name=excluded.name,
+    start_date=excluded.start_date,
+    end_date=excluded.end_date,
+    time=excluded.time,
+    category_json=excluded.category_json,
+    cost=excluded.cost,
+    venue=excluded.venue,
+    city=excluded.city,
+    url=excluded.url,
+    what3words=excluded.what3words,
+    summary=excluded.summary,
+    accessibility_json=excluded.accessibility_json,
+    audience_json=excluded.audience_json,
+    indoor=excluded.indoor,
+    activity_level=excluded.activity_level,
+    vibe=excluded.vibe,
+    planning_json=excluded.planning_json,
+    source_trust=excluded.source_trust,
+    source_event_id=excluded.source_event_id,
+    source_event_url=excluded.source_event_url,
+    source_feed_url=excluded.source_feed_url,
+    verification_status=excluded.verification_status,
+    evidence_json=excluded.evidence_json,
+    first_seen_at=COALESCE(events.first_seen_at, excluded.first_seen_at),
+    last_seen_at=excluded.last_seen_at,
+    lat=excluded.lat,
+    lng=excluded.lng,
+    source=excluded.source
+`);
+
+const ensureVoteRow = db.prepare(`
+  INSERT INTO votes (event_id, count) VALUES (?, 0)
+  ON CONFLICT(event_id) DO NOTHING
+`);
+
+const ensureVoteRowWithPopularity = db.prepare(`
+  INSERT INTO votes (event_id, count) VALUES (?, ?)
+  ON CONFLICT(event_id) DO NOTHING
+`);
+
+async function ingestCuratedEvents() {
+  const incoming = await getCuratedEvents();
+  if (!incoming.length) {
+    return 0;
+  }
+
+  const tx = db.transaction((items) => {
+    db.prepare("DELETE FROM votes WHERE event_id IN (SELECT id FROM events WHERE source != 'user')").run();
+    db.prepare("DELETE FROM events WHERE source != 'user'").run();
+    for (const item of items) {
+      const row = toEventRow({ ...item, status: "approved" });
+      insertEvent.run(row);
+      ensureVoteRowWithPopularity.run(row.id, Number(item.popularity ?? 0));
+    }
+  });
+  tx(incoming);
+  return incoming.length;
+}
+
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true, service: "mydaysoff-api" });
+});
+
+app.get("/api/events", (_req, res) => {
+  const rows = db
+    .prepare(
+      `
+      SELECT e.*, COALESCE(v.count, 0) AS votes
+      FROM events e
+      LEFT JOIN votes v ON v.event_id = e.id
+      WHERE e.status = 'approved' AND e.verification_status IN ('feed-listing', 'ticketmaster-listing', 'community-submitted')
+      ORDER BY e.start_date ASC, e.created_at DESC
+      `,
+    )
+    .all();
+
+  res.json({ events: rows.map(formatEvent) });
+});
+
+app.post("/api/events/submissions", (req, res) => {
+  const payload = req.body || {};
+  if (!payload.name || !payload.start_date) {
+    return res.status(400).json({ error: "name and start_date are required" });
+  }
+
+  const event = toEventRow({
+    ...payload,
+    id: `user_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+    status: "pending",
+    source: "user",
+    source_trust: "community",
+    verification_status: "community-submitted",
+    evidence: {
+      publisher: "Community submission",
+      item_title: payload.name || "",
+      published_at: new Date().toISOString(),
+    },
+  });
+
+  if (!Number.isFinite(event.lat) || !Number.isFinite(event.lng)) {
+    return res.status(400).json({ error: "lat/lng must be numbers" });
+  }
+
+  insertEvent.run(event);
+  ensureVoteRow.run(event.id);
+  return res.status(201).json({ ok: true, id: event.id, status: "pending" });
+});
+
+app.post("/api/events/:id/vote", (req, res) => {
+  const id = req.params.id;
+
+  const found = db.prepare("SELECT id FROM events WHERE id = ? AND status = 'approved'").get(id);
+  if (!found) return res.status(404).json({ error: "event not found" });
+
+  ensureVoteRow.run(id);
+  db.prepare("UPDATE votes SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE event_id = ?").run(id);
+
+  const row = db.prepare("SELECT count FROM votes WHERE event_id = ?").get(id);
+  return res.json({ ok: true, id, likes: Number(row.count || 0) });
+});
+
+function requireAdmin(req, res, next) {
+  const token = req.headers["x-admin-token"];
+  if (token !== adminToken) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  return next();
+}
+
+app.get("/api/admin/submissions", requireAdmin, (_req, res) => {
+  const rows = db
+    .prepare(
+      `
+      SELECT e.*, COALESCE(v.count, 0) AS votes
+      FROM events e
+      LEFT JOIN votes v ON v.event_id = e.id
+      WHERE e.status = 'pending'
+      ORDER BY e.created_at DESC
+      `,
+    )
+    .all();
+  res.json({ submissions: rows.map(formatEvent) });
+});
+
+app.patch("/api/admin/events/:id/status", requireAdmin, (req, res) => {
+  const { status } = req.body || {};
+  if (!["approved", "rejected", "pending"].includes(status)) {
+    return res.status(400).json({ error: "invalid status" });
+  }
+
+  const result = db.prepare("UPDATE events SET status = ? WHERE id = ?").run(status, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "event not found" });
+
+  return res.json({ ok: true, id: req.params.id, status });
+});
+
+app.post("/api/admin/ingest", requireAdmin, async (_req, res) => {
+  const imported = await ingestCuratedEvents();
+  return res.json({ ok: true, imported });
+});
+
+app.post("/api/geocode/what3words", async (req, res) => {
+  const apiKey = process.env.WHAT3WORDS_API_KEY;
+  const words = String(req.body?.words || "").trim().replace(/^\/+/, "");
+
+  if (!words) return res.status(400).json({ error: "words are required" });
+  if (!apiKey) {
+    return res.status(501).json({
+      error: "what3words API key not configured",
+      hint: "Set WHAT3WORDS_API_KEY in your .env file",
+    });
+  }
+
+  const url = new URL("https://api.what3words.com/v3/convert-to-coordinates");
+  url.searchParams.set("words", words);
+  url.searchParams.set("key", apiKey);
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (!response.ok || !data?.coordinates) {
+    return res.status(400).json({ error: "Could not resolve what3words", details: data });
+  }
+
+  return res.json({
+    words: data.words,
+    lat: data.coordinates.lat,
+    lng: data.coordinates.lng,
+    country: data.country,
+  });
+});
+
+app.post("/api/stripe/checkout", async (req, res) => {
+  const secret = process.env.STRIPE_SECRET_KEY;
+  const priceId = process.env.STRIPE_PRICE_ID;
+
+  if (!secret || !priceId) {
+    return res.status(501).json({
+      error: "Stripe not configured",
+      hint: "Set STRIPE_SECRET_KEY and STRIPE_PRICE_ID in .env",
+    });
+  }
+
+  const stripe = new Stripe(secret, { apiVersion: "2025-01-27.acacia" });
+  const origin = req.body?.origin || process.env.APP_ORIGIN || "http://localhost:5173";
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${origin}/#/`,
+    cancel_url: `${origin}/#/`,
+  });
+
+  return res.json({ checkoutUrl: session.url });
+});
+
+app.post("/api/stripe/webhook", (req, res) => {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret || !process.env.STRIPE_SECRET_KEY) {
+    return res.status(501).json({ error: "Stripe webhook not configured" });
+  }
+
+  // Webhook signature verification and subscription-state persistence goes here.
+  return res.json({ received: true });
+});
+
+app.listen(port, async () => {
+  let imported = 0;
+  try {
+    imported = await ingestCuratedEvents();
+  } catch (error) {
+    console.error("Initial ingest failed", error);
+  }
+
+  setInterval(async () => {
+    try {
+      await ingestCuratedEvents();
+    } catch (error) {
+      console.error("Scheduled ingest failed", error);
+    }
+  }, refreshMs).unref();
+
+  console.log(`MyDaysOff API listening on http://localhost:${port}`);
+  console.log(`Auto-ingested curated events: ${imported} (refresh every ${Math.round(refreshMs / 60000)} min)`);
+});
