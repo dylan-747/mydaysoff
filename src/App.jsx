@@ -258,7 +258,7 @@ export default function App() {
               </div>
             </a>
           </div>
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-1 sm:gap-2">
             <a href="#/about" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
               About
             </a>
@@ -267,10 +267,11 @@ export default function App() {
             </a>
             <button
               onClick={handleSupport}
-              className="rounded-xl px-3 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95"
+              className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
               title="First month free, then £1/month"
             >
-              Start free month (£1/mo after)
+              <span className="sm:hidden">Free month</span>
+              <span className="hidden sm:inline">Start free month (£1/mo after)</span>
             </button>
             <button
               onClick={loadEvents}
