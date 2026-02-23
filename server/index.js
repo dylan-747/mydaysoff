@@ -15,25 +15,99 @@ const stripeTrialDays = Number(process.env.STRIPE_TRIAL_DAYS || 30);
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+function asList(input) {
+  if (Array.isArray(input)) return input.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof input === "string") {
+    return input
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function asTagList(input) {
+  return asList(input)
+    .map((item) => item.toLowerCase())
+    .filter(Boolean);
+}
+
+function cleanText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function summarizeEvent(input) {
+  const name = cleanText(input.name || "event");
+  const city = cleanText(input.city || "");
+  const start = cleanText(input.start_date || "");
+  const end = cleanText(input.end_date || "");
+  const time = cleanText(input.time || "");
+  const category = asTagList(input.category)[0] || "";
+  const indoor = cleanText(input.indoor || "");
+  const cost = cleanText(input.cost || "");
+  const accessibility = asTagList(input.accessibility);
+  const audience = asTagList(input.audience);
+  const bookingRequired = Boolean(input.planning?.booking_required);
+
+  const costPrefix =
+    cost === "free" ? "Free" : cost === "donation" ? "Donation-based" : cost === "paid" ? "Paid" : "Local";
+  const typeWord = category ? `${category} event` : "community event";
+  const settingWord = indoor === "indoor" ? "indoor" : indoor === "outdoor" ? "outdoor" : indoor === "mixed" ? "mixed" : "";
+  const placeWord = city || "your area";
+
+  const base = [costPrefix, settingWord, typeWord, `in ${placeWord}`].filter(Boolean).join(" ");
+
+  const datePhrase = start ? (end && end !== start ? `${start} to ${end}` : start) : "";
+  const timePhrase = time ? (datePhrase ? `${datePhrase} at ${time}` : time) : datePhrase;
+  const whenPart = timePhrase ? ` on ${timePhrase}` : "";
+
+  const detailParts = [];
+  const audienceLabel = audience.includes("all-ages") ? "all ages" : audience[0];
+  if (audienceLabel) detailParts.push(audienceLabel);
+  if (bookingRequired) detailParts.push("booking required");
+  if (accessibility.length) detailParts.push(accessibility[0]);
+
+  let summary = `${base}${whenPart}`;
+  if (detailParts.length) summary += ` · ${detailParts.join(" · ")}`;
+  summary = `${summary}.`.replace(/\s+/g, " ").trim();
+
+  // Fall back to title only when structured fields are too sparse.
+  if (summary.length < 24) {
+    summary = `${name} in ${placeWord}${whenPart}.`;
+  }
+
+  if (summary.length > 145) {
+    const hard = summary.slice(0, 145);
+    const cut = hard.lastIndexOf(" ");
+    summary = `${(cut > 70 ? hard.slice(0, cut) : hard).trim().replace(/[.,;:!?-]+$/, "")}.`;
+  }
+  return summary;
+}
+
 function toEventRow(input) {
+  const category = asTagList(input.category);
+  const accessibility = asTagList(input.accessibility);
+  const audience = asTagList(input.audience);
   return {
     id: input.id,
     name: input.name,
     start_date: input.start_date,
     end_date: input.end_date || input.start_date,
     time: input.time || "",
-    category_json: JSON.stringify(input.category || []),
+    category_json: JSON.stringify(category),
     cost: input.cost || "free",
     venue: input.venue || "",
     city: input.city || "Edinburgh",
     url: input.url || "#",
     what3words: input.what3words || "",
-    summary: input.summary || "",
-    accessibility_json: JSON.stringify(input.accessibility || []),
-    audience_json: JSON.stringify(input.audience || []),
-    indoor: input.indoor || "",
-    activity_level: input.activity_level || "",
-    vibe: input.vibe || "",
+    summary: summarizeEvent(input),
+    accessibility_json: JSON.stringify(accessibility),
+    audience_json: JSON.stringify(audience),
+    indoor: cleanText(input.indoor || "").toLowerCase(),
+    activity_level: cleanText(input.activity_level || "").toLowerCase(),
+    vibe: cleanText(input.vibe || "").toLowerCase(),
     planning_json: JSON.stringify(input.planning || {}),
     source_trust: input.source_trust || "trusted-partner",
     source_event_id: input.source_event_id || "",
@@ -51,7 +125,7 @@ function toEventRow(input) {
 }
 
 function formatEvent(row) {
-  return {
+  const event = {
     id: row.id,
     name: row.name,
     start_date: row.start_date,
@@ -84,6 +158,8 @@ function formatEvent(row) {
     status: row.status,
     source: row.source,
   };
+  event.summary = summarizeEvent(event);
+  return event;
 }
 
 const insertEvent = db.prepare(`

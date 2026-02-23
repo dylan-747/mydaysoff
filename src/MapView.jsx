@@ -93,7 +93,7 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
       const isSelected = selectedEventId && e.id === selectedEventId;
 
       if (heatMode) {
-        const color = isSelected ? "#dc2626" : heatColor(votes);
+        const color = isSelected ? "#ff6a3d" : heatColor(votes);
         const marker = L.circleMarker([e.lat, e.lng], {
           radius: 6 + Math.min(votes, 20) * 0.45 + (isSelected ? 2 : 0),
           color,
