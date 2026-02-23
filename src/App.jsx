@@ -99,6 +99,18 @@ const IconExternal = (props) => (
   </svg>
 );
 
+const IconChevronLeft = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path d="M15 18l-6-6 6-6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconChevronRight = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path d="M9 18l6-6-6-6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const CATEGORIES = [
   { value: "", label: "All" },
   { value: "family", label: "Family" },
@@ -223,6 +235,31 @@ export default function App() {
 
   const visibleEvents = useMemo(() => dayFiltered.filter((event) => inBounds(event, mapBounds)), [dayFiltered, mapBounds]);
   const listEvents = visibleEvents.length > 0 ? visibleEvents : dayFiltered;
+  const navigationEvents = useMemo(() => {
+    return [...events]
+      .filter((e) => {
+        const matchCat = !category || (e.category || []).includes(category);
+        const matchCost = !cost || e.cost === cost;
+        return matchCat && matchCost;
+      })
+      .sort((a, b) => {
+        const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
+        if (dateCmp !== 0) return dateCmp;
+        const timeCmp = String(a.time || "").localeCompare(String(b.time || ""));
+        if (timeCmp !== 0) return timeCmp;
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+  }, [events, category, cost]);
+  const selectedNavIndex = useMemo(
+    () => (selectedEvent ? navigationEvents.findIndex((event) => event.id === selectedEvent.id) : -1),
+    [navigationEvents, selectedEvent],
+  );
+  const canNavigate = selectedNavIndex >= 0 && navigationEvents.length > 1;
+  const mapEvents = useMemo(() => {
+    if (!selectedEvent) return dayFiltered;
+    const inDayFiltered = dayFiltered.some((event) => event.id === selectedEvent.id);
+    return inDayFiltered ? dayFiltered : [...dayFiltered, selectedEvent];
+  }, [dayFiltered, selectedEvent]);
 
   async function toggleLike(id) {
     try {
@@ -240,6 +277,19 @@ export default function App() {
       if (data.checkoutUrl) window.location.href = data.checkoutUrl;
     } catch (err) {
       setError("Subscription checkout is not connected yet. Set Stripe keys in the API env.");
+    }
+  }
+
+  function moveSelectedEvent(step) {
+    if (!canNavigate) return;
+    const nextIndex = (selectedNavIndex + step + navigationEvents.length) % navigationEvents.length;
+    const nextEvent = navigationEvents[nextIndex];
+    if (!nextEvent) return;
+    setSelectedEvent(nextEvent);
+    setFocusedEventId(nextEvent.id);
+    const dayIdx = days.findIndex((d) => ymd(d) === nextEvent.start_date);
+    if (dayIdx >= 0 && dayIdx !== selectedIndex) {
+      setSelectedIndex(dayIdx);
     }
   }
 
@@ -362,10 +412,11 @@ export default function App() {
           </div>
           <div className="absolute inset-0">
             <MapView
-              events={dayFiltered}
+              events={mapEvents}
               heatMode={heat}
               onBoundsChange={setMapBounds}
               focusEventId={focusedEventId}
+              selectedEventId={selectedEvent?.id || null}
               onEventSelect={setSelectedEvent}
             />
           </div>
@@ -374,7 +425,17 @@ export default function App() {
         {selectedEvent && (
           <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <button
+                onClick={() => moveSelectedEvent(-1)}
+                disabled={!canNavigate}
+                aria-label="Previous event"
+                className="mt-0.5 h-11 w-11 shrink-0 rounded-full border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:bg-slate-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                style={{ WebkitTapHighlightColor: "transparent" }}
+              >
+                <IconChevronLeft className="mx-auto h-5 w-5" />
+              </button>
+
+              <div className="flex-1 min-w-0">
                 <h3 className="text-xl font-bold">{selectedEvent.name}</h3>
                 <p className="text-sm text-slate-600 mt-1">
                   {selectedEvent.start_date}
@@ -382,6 +443,17 @@ export default function App() {
                   {selectedEvent.venue ? ` • ${selectedEvent.venue}` : ""}
                 </p>
               </div>
+
+              <button
+                onClick={() => moveSelectedEvent(1)}
+                disabled={!canNavigate}
+                aria-label="Next event"
+                className="mt-0.5 h-11 w-11 shrink-0 rounded-full border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:bg-slate-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                style={{ WebkitTapHighlightColor: "transparent" }}
+              >
+                <IconChevronRight className="mx-auto h-5 w-5" />
+              </button>
+
               <button
                 className="rounded-xl border border-slate-200 px-3 py-1 text-sm hover:bg-slate-50"
                 onClick={() => setSelectedEvent(null)}
