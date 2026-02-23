@@ -12,7 +12,7 @@ export default function About() {
             </div>
             <div>
               <h1 className="text-lg font-bold leading-tight">My Days Off</h1>
-              <p className="text-xs text-slate-500 -mt-0.5">Clearer event planning, less stress.</p>
+              <p className="text-xs text-slate-500 -mt-0.5">Less noise. More life.</p>
             </div>
           </a>
           <nav className="flex items-center gap-2">
@@ -24,10 +24,10 @@ export default function About() {
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6">
-          <h2 className="text-2xl font-bold">A calmer way to choose your day</h2>
+          <h2 className="text-2xl font-bold">What this app does</h2>
           <p className="mt-3 text-slate-700 leading-relaxed">
-            My Days Off exists to reduce event-planning confusion. We surface what matters first: cost, vibe,
-            accessibility, effort level, and practical planning notes. Less noise. Better decisions.
+            My Days Off is a map-based event browser for UK events. It combines curated source data and moderated
+            community submissions so you can see what is happening by date and location.
           </p>
         </section>
 
@@ -35,38 +35,37 @@ export default function About() {
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">🧭 Clarity over clutter</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Every listing aims to answer the same questions quickly: who it is for, how active it is, whether it is
-              indoors/outdoors, and what to bring.
+              Event cards show core details first: date, time, place, cost, categories, and practical notes.
+              This is designed to reduce missing information before people plan.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">♿ Accessibility first</h3>
             <p className="mt-2 text-sm text-slate-700">
-              We encourage organisers to include wheelchair access, hearing support, quiet-space notes, and practical
-              facilities so people can plan with confidence.
+              Submitters can include accessibility and audience fields (for example wheelchair access or all-ages).
+              These fields appear directly on listings to support better planning.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">🔥 Community signal</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Fire votes show what feels most relevant in each area right now. No downvotes, no dogpiles, just useful
-              positive signal.
+              Fire votes are upvotes only. They help sort events by current interest without downvote behaviour.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">🤝 Trusted sources + local voice</h3>
             <p className="mt-2 text-sm text-slate-700">
-              We combine trusted public sources with community submissions. Submissions are moderated before they go
-              live.
+              Data comes from trusted feeds where available plus user submissions. User submissions are held for
+              moderation before approval.
             </p>
           </article>
         </section>
 
         <section className="rounded-3xl bg-[#14213d] text-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold">What we are building next</h3>
+          <h3 className="text-xl font-semibold">Current scope</h3>
           <p className="mt-2 text-sm text-white/90">
-            Better live integrations, richer planning fields, and supporter features that keep the product ad-free while
-            staying genuinely useful.
+            Current focus is feed reliability, mobile stability, moderation workflow, and subscription support
+            (first month free, then £1/month).
           </p>
         </section>
       </main>
