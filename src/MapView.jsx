@@ -78,15 +78,6 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
     const pts = events.filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lng));
     pts.forEach((e) => {
       const votes = Number(e.likes ?? 0);
-      const access = (e.accessibility || []).join(", ");
-      const audience = (e.audience || []).join(", ");
-      const vibe = e.vibe ? `<br>Vibe: ${e.vibe}` : "";
-      const level = e.activity_level ? `<br>Activity: ${e.activity_level}` : "";
-      const summary = e.summary ? `<br>${e.summary}` : "";
-      const verification = e.verification_status ? `<br>Verification: ${e.verification_status}` : "";
-      const popup = `<strong>${e.name}</strong><br>${e.venue || ""}${e.time ? `<br>${e.time}` : ""}${
-        e.what3words ? `<br>///${e.what3words}` : ""
-      }${summary}${vibe}${level}${verification}${access ? `<br>Access: ${access}` : ""}${audience ? `<br>Good for: ${audience}` : ""}<br>Votes: ${votes}`;
 
       if (heatMode) {
         const marker = L.circleMarker([e.lat, e.lng], {
@@ -96,14 +87,13 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
           fillOpacity: 0.55,
           weight: 1.5,
         })
-          .bindPopup(popup)
           .addTo(layer);
         marker.on("click", () => onEventSelect?.(e));
         markerByIdRef.current[e.id] = marker;
         return;
       }
 
-      const marker = L.marker([e.lat, e.lng]).bindPopup(popup).addTo(layer);
+      const marker = L.marker([e.lat, e.lng]).addTo(layer);
       marker.on("click", () => onEventSelect?.(e));
       markerByIdRef.current[e.id] = marker;
     });
@@ -126,7 +116,6 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
 
     const latLng = marker.getLatLng();
     map.flyTo(latLng, Math.max(map.getZoom(), 9), { duration: 0.5 });
-    marker.openPopup();
   }, [focusEventId]);
 
   return <div ref={containerRef} className="absolute inset-0 rounded-3xl" />;
