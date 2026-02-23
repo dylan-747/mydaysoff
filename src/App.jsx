@@ -355,14 +355,14 @@ export default function App() {
               <a href="#/submit" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
                 Submit
               </a>
-            <button
-              onClick={openNewsletter}
-              className="rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
-              title="Join weekly local picks"
-            >
-              <span className="sm:hidden">Weekly picks</span>
-              <span className="hidden sm:inline">Get weekly local picks</span>
-            </button>
+              <button
+                onClick={openNewsletter}
+                className="shrink-0 rounded-xl px-2 py-1.5 text-xs font-semibold bg-[#ff6a3d] text-white shadow-sm transition hover:brightness-95 whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm"
+                title="Join weekly local picks"
+              >
+                <span className="sm:hidden">Picks</span>
+                <span className="hidden sm:inline">Get weekly local picks</span>
+              </button>
           </nav>
         </div>
         </div>

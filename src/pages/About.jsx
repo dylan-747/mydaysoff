@@ -179,14 +179,15 @@ export default function About() {
           <p className="mt-2 text-xs text-white/75">
             Live now: {stats.weekly} events this week across {stats.cities} cities.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
             <button
               onClick={handleStartTrial}
-              className="rounded-xl px-3 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm hover:brightness-95"
+              className="w-full sm:w-auto rounded-xl px-3 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm hover:brightness-95 whitespace-nowrap"
             >
-              Become a local insider
+              <span className="sm:hidden">Become insider</span>
+              <span className="hidden sm:inline">Become a local insider</span>
             </button>
-            <a href="#/" className="rounded-xl px-3 py-2 text-sm font-semibold border border-white/30 hover:bg-white/10">
+            <a href="#/" className="w-full sm:w-auto rounded-xl px-3 py-2 text-sm font-semibold border border-white/30 hover:bg-white/10 text-center">
               Explore events
             </a>
           </div>
