@@ -266,8 +266,23 @@ export async function getCuratedEvents() {
     getOpenActiveEvents(),
   ]);
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
+  const liveOnly = process.env.LIVE_EVENTS_ONLY !== "false";
   const minWeeklyEvents = Number(process.env.MIN_WEEKLY_EVENTS || DEFAULT_MIN_WEEKLY_EVENTS);
   const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster, ...openActive]);
+
+  if (liveOnly) {
+    const liveBalanced = selectBalanced(mergedReal, {
+      maxTotal: 420,
+      perDayLimit: 64,
+      perDayCityLimit: 10,
+      perDayCategoryLimit: 14,
+    });
+    return liveBalanced.sort((a, b) => {
+      const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
+      if (dateCmp !== 0) return dateCmp;
+      return qualityScore(b) - qualityScore(a);
+    });
+  }
 
   const staticSample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents()];
   const popularSeeds = getPopularEventSeeds();
