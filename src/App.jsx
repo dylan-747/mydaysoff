@@ -500,29 +500,32 @@ export default function App() {
             {selectedEvent.summary && <p className="mt-3 text-sm text-slate-700">{selectedEvent.summary}</p>}
 
             <div className="mt-4 flex flex-wrap gap-2">
+              {(selectedEvent.category?.length ? selectedEvent.category : ["community"]).map((c) => (
+                <span key={`inline-cat-${selectedEvent.id}-${c}`} className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 lowercase">
+                  {c}
+                </span>
+              ))}
               {formatIndoor(selectedEvent.indoor) && (
                 <span className="text-xs rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 lowercase">{formatIndoor(selectedEvent.indoor)}</span>
               )}
               {formatLevel(selectedEvent.activity_level) && (
                 <span className="text-xs rounded-full bg-amber-50 text-amber-700 px-2.5 py-1 lowercase">{formatLevel(selectedEvent.activity_level)}</span>
               )}
-              {selectedEvent.vibe && (
-                <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1 lowercase">✨ {selectedEvent.vibe}</span>
-              )}
+              <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1 lowercase">✨ {selectedEvent.vibe || "social"}</span>
               {selectedEvent.source_trust && (
                 <span className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 lowercase">source: {selectedEvent.source_trust}</span>
               )}
               <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2.5 py-1 lowercase">
                 🔎 {verificationLabel(selectedEvent.verification_status)}
               </span>
-              {(selectedEvent.accessibility || []).map((tag) => (
+              {(selectedEvent.accessibility?.length ? selectedEvent.accessibility : ["check venue"]).map((tag) => (
                 <span key={`inline-${selectedEvent.id}-${tag}`} className="text-xs rounded-full bg-lime-50 text-lime-700 px-2.5 py-1 lowercase">
                   ♿ {tag}
                 </span>
               ))}
-              {formatAudience(selectedEvent.audience) && (
-                <span className="text-xs rounded-full bg-sky-50 text-sky-700 px-2.5 py-1 lowercase">{formatAudience(selectedEvent.audience)}</span>
-              )}
+              <span className="text-xs rounded-full bg-sky-50 text-sky-700 px-2.5 py-1 lowercase">
+                {formatAudience(selectedEvent.audience?.length ? selectedEvent.audience : ["all-ages"])}
+              </span>
             </div>
 
             <div className="mt-4 text-sm text-slate-700 space-y-1">
@@ -602,7 +605,7 @@ export default function App() {
                     {e.summary && <p className="mt-1 text-xs text-slate-600">{e.summary}</p>}
                     <div className="mt-2 flex flex-wrap gap-1">
                       <span className="text-[10px] rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 lowercase">{e.city}</span>
-                      {(e.category || []).map((c) => (
+                      {(e.category?.length ? e.category : ["community"]).map((c) => (
                         <span key={c} className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
                           {c}
                         </span>
@@ -613,17 +616,17 @@ export default function App() {
                       {formatLevel(e.activity_level) && (
                         <span className="text-[10px] rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 lowercase">{formatLevel(e.activity_level)}</span>
                       )}
-                      {e.vibe && <span className="text-[10px] rounded-full bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 lowercase">✨ {e.vibe}</span>}
+                      <span className="text-[10px] rounded-full bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 lowercase">✨ {e.vibe || "social"}</span>
                       <span className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
                         🔎 {verificationLabel(e.verification_status)}
                       </span>
                       {e.source && (
                         <span className="text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 lowercase">source: {e.source}</span>
                       )}
-                      {formatAudience(e.audience) && (
-                        <span className="text-[10px] rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 lowercase">{formatAudience(e.audience)}</span>
-                      )}
-                      {(e.accessibility || []).slice(0, 2).map((tag) => (
+                      <span className="text-[10px] rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 lowercase">
+                        {formatAudience(e.audience?.length ? e.audience : ["all-ages"])}
+                      </span>
+                      {(e.accessibility?.length ? e.accessibility : ["check venue"]).slice(0, 2).map((tag) => (
                         <span key={`${e.id}-${tag}`} className="text-[10px] rounded-full bg-lime-50 text-lime-700 px-2 py-0.5 lowercase">
                           ♿ {tag}
                         </span>

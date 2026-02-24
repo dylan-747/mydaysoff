@@ -25,6 +25,11 @@ export function getPopularEventSeeds() {
     { city: "Belfast", lat: 54.5973, lng: -5.9301, sourceUrl: "https://visitbelfast.com/", venues: ["Cathedral Quarter", "Titanic Quarter", "Ormeau", "Queen's Quarter"] },
     { city: "Newcastle", lat: 54.9783, lng: -1.6178, sourceUrl: "https://newcastlegateshead.com/", venues: ["Quayside", "Ouseburn", "Grainger", "Jesmond"] },
     { city: "Liverpool", lat: 53.4084, lng: -2.9916, sourceUrl: "https://www.visitliverpool.com/", venues: ["Baltic Triangle", "Albert Dock", "Ropewalks", "Lark Lane"] },
+    { city: "Sheffield", lat: 53.3811, lng: -1.4701, sourceUrl: "https://www.welcometosheffield.co.uk/", venues: ["Kelham Island", "Devonshire Quarter", "Peace Gardens", "Sharrow"] },
+    { city: "Nottingham", lat: 52.9548, lng: -1.1581, sourceUrl: "https://www.visit-nottinghamshire.co.uk/", venues: ["Lace Market", "Hockley", "Canal Quarter", "Old Market Square"] },
+    { city: "Southampton", lat: 50.9097, lng: -1.4044, sourceUrl: "https://visitsouthampton.co.uk/", venues: ["Ocean Village", "Guildhall Square", "Bedford Place", "Old Town"] },
+    { city: "Plymouth", lat: 50.3755, lng: -4.1427, sourceUrl: "https://www.visitplymouth.co.uk/", venues: ["Barbican", "Royal William Yard", "Hoe", "Devonport"] },
+    { city: "Aberdeen", lat: 57.1497, lng: -2.0943, sourceUrl: "https://www.visitabdn.com/", venues: ["Union Terrace", "Footdee", "Beach Esplanade", "Castlegate"] },
   ];
 
   const templates = [
@@ -41,14 +46,17 @@ export function getPopularEventSeeds() {
   ];
 
   const events = [];
-  for (let offset = 0; offset < 14; offset += 1) {
+  for (let offset = 0; offset < 21; offset += 1) {
     const date = addDays(today, offset);
     for (const city of cities) {
-      for (let slot = 0; slot < 2; slot += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
         const seed = offset * 31 + city.city.length * 7 + slot * 13;
         const template = pick(templates, seed);
         const venue = pick(city.venues, seed + 3);
         const id = seededId(date, city.city, `${template.title}_${slot}`);
+        const indoor = slot % 3 === 0 ? "outdoor" : slot % 3 === 1 ? "indoor" : "mixed";
+        const level = slot % 3 === 0 ? "medium" : slot % 3 === 1 ? "low" : "high";
+        const vibe = slot % 3 === 0 ? "social" : slot % 3 === 1 ? "chill" : "active";
         events.push({
           id,
           name: `${city.city} ${template.title}`,
@@ -65,6 +73,16 @@ export function getPopularEventSeeds() {
           lng: city.lng + (((seed + 2) % 5) - 2) * 0.015,
           source: "curated-api-seed",
           popularity: template.popularity + Math.max(0, 10 - offset) + slot,
+          accessibility: slot % 2 === 0 ? ["wheelchair"] : ["hearing-loop"],
+          audience: slot % 2 === 0 ? ["all-ages"] : ["adults", "teens"],
+          indoor,
+          activity_level: level,
+          vibe,
+          planning: {
+            booking_required: slot % 2 === 0,
+            public_transport: "Near main bus/train links",
+            bring_with_you: slot % 3 === 0 ? "Water and warm layer" : "Optional card payment",
+          },
         });
       }
     }

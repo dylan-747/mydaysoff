@@ -3,6 +3,7 @@ import { getCivicEvents } from "./sources/civicEvents.js";
 import { getCultureEvents } from "./sources/cultureEvents.js";
 import { getTicketmasterEvents } from "./sources/ticketmasterEvents.js";
 import { getFeedRegistryEvents } from "./sources/feedRegistryEvents.js";
+import { getPopularEventSeeds } from "./popularEvents.js";
 
 function normalizeName(name) {
   return String(name || "")
@@ -36,8 +37,10 @@ function dedupeEvents(events) {
 export async function getCuratedEvents() {
   const [ticketmaster, feedRegistry] = await Promise.all([getTicketmasterEvents(), getFeedRegistryEvents()]);
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
-  const sample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents()];
+  const sample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents(), ...getPopularEventSeeds()];
   const mergedReal = [...feedRegistry, ...ticketmaster];
-  const merged = mergedReal.length > 0 ? [...mergedReal, ...(includeSample ? sample : [])] : sample;
+  // Keep the feed feeling alive even when upstream APIs are sparse.
+  const shouldBlendSample = includeSample || mergedReal.length < 120;
+  const merged = mergedReal.length > 0 ? [...mergedReal, ...(shouldBlendSample ? sample : [])] : sample;
   return dedupeEvents(merged);
 }

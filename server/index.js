@@ -27,9 +27,13 @@ function asList(input) {
 }
 
 function asTagList(input) {
-  return asList(input)
-    .map((item) => item.toLowerCase())
-    .filter(Boolean);
+  return Array.from(
+    new Set(
+      asList(input)
+        .map((item) => item.toLowerCase())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function cleanText(value) {
@@ -86,46 +90,65 @@ function summarizeEvent(input) {
   return summary;
 }
 
-function toEventRow(input) {
+function withEventDefaults(input) {
   const category = asTagList(input.category);
   const accessibility = asTagList(input.accessibility);
   const audience = asTagList(input.audience);
+
   return {
-    id: input.id,
-    name: input.name,
-    start_date: input.start_date,
-    end_date: input.end_date || input.start_date,
-    time: input.time || "",
-    category_json: JSON.stringify(category),
-    cost: input.cost || "free",
-    venue: input.venue || "",
-    city: input.city || "Edinburgh",
-    url: input.url || "#",
-    what3words: input.what3words || "",
-    summary: summarizeEvent(input),
-    accessibility_json: JSON.stringify(accessibility),
-    audience_json: JSON.stringify(audience),
-    indoor: cleanText(input.indoor || "").toLowerCase(),
-    activity_level: cleanText(input.activity_level || "").toLowerCase(),
-    vibe: cleanText(input.vibe || "").toLowerCase(),
-    planning_json: JSON.stringify(input.planning || {}),
-    source_trust: input.source_trust || "trusted-partner",
-    source_event_id: input.source_event_id || "",
-    source_event_url: input.source_event_url || input.url || "",
-    source_feed_url: input.source_feed_url || "",
-    verification_status: input.verification_status || "community-submitted",
-    evidence_json: JSON.stringify(input.evidence || {}),
-    first_seen_at: input.first_seen_at || new Date().toISOString(),
-    last_seen_at: input.last_seen_at || new Date().toISOString(),
-    lat: Number(input.lat ?? 55.9533),
-    lng: Number(input.lng ?? -3.1883),
-    status: input.status || "pending",
-    source: input.source || "user",
+    ...input,
+    category: category.length ? category : ["community"],
+    accessibility: accessibility.length ? accessibility : ["check venue"],
+    audience: audience.length ? audience : ["all-ages"],
+    indoor: cleanText(input.indoor || "mixed").toLowerCase() || "mixed",
+    activity_level: cleanText(input.activity_level || "medium").toLowerCase() || "medium",
+    vibe: cleanText(input.vibe || "social").toLowerCase() || "social",
+    planning: {
+      booking_required: Boolean(input.planning?.booking_required),
+      public_transport: cleanText(input.planning?.public_transport || "check source"),
+      bring_with_you: cleanText(input.planning?.bring_with_you || "check listing details"),
+    },
+  };
+}
+
+function toEventRow(input) {
+  const normalized = withEventDefaults(input);
+  return {
+    id: normalized.id,
+    name: normalized.name,
+    start_date: normalized.start_date,
+    end_date: normalized.end_date || normalized.start_date,
+    time: normalized.time || "",
+    category_json: JSON.stringify(normalized.category),
+    cost: normalized.cost || "free",
+    venue: normalized.venue || "",
+    city: normalized.city || "Edinburgh",
+    url: normalized.url || "#",
+    what3words: normalized.what3words || "",
+    summary: summarizeEvent(normalized),
+    accessibility_json: JSON.stringify(normalized.accessibility),
+    audience_json: JSON.stringify(normalized.audience),
+    indoor: normalized.indoor,
+    activity_level: normalized.activity_level,
+    vibe: normalized.vibe,
+    planning_json: JSON.stringify(normalized.planning || {}),
+    source_trust: normalized.source_trust || "trusted-partner",
+    source_event_id: normalized.source_event_id || "",
+    source_event_url: normalized.source_event_url || normalized.url || "",
+    source_feed_url: normalized.source_feed_url || "",
+    verification_status: normalized.verification_status || "community-submitted",
+    evidence_json: JSON.stringify(normalized.evidence || {}),
+    first_seen_at: normalized.first_seen_at || new Date().toISOString(),
+    last_seen_at: normalized.last_seen_at || new Date().toISOString(),
+    lat: Number(normalized.lat ?? 55.9533),
+    lng: Number(normalized.lng ?? -3.1883),
+    status: normalized.status || "pending",
+    source: normalized.source || "user",
   };
 }
 
 function formatEvent(row) {
-  const event = {
+  const event = withEventDefaults({
     id: row.id,
     name: row.name,
     start_date: row.start_date,
@@ -157,7 +180,7 @@ function formatEvent(row) {
     likes: Number(row.votes || 0),
     status: row.status,
     source: row.source,
-  };
+  });
   event.summary = summarizeEvent(event);
   return event;
 }
