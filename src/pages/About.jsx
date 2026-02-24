@@ -87,10 +87,10 @@ export default function About() {
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6">
-          <h2 className="text-2xl font-bold">Find what is actually worth your time.</h2>
+          <h2 className="text-2xl font-bold">Find what is genuinely worth your time.</h2>
           <p className="mt-3 text-slate-700 leading-relaxed">
             My Days Off is a map-based event browser for UK events. It combines curated source data and moderated
-            community submissions so you can see what is happening by date and location.
+            community submissions so you can see what is happening, where it is, and whether it fits your day.
           </p>
         </section>
 
@@ -120,7 +120,7 @@ export default function About() {
               Open map
             </a>
           </div>
-          <p className="mt-2 text-sm text-slate-600">Complete these once and you have the full product flow.</p>
+          <p className="mt-2 text-sm text-slate-600">Complete these steps once and you have the full product flow.</p>
 
           <div className="mt-4 grid md:grid-cols-3 gap-3">
             <label className="rounded-xl border border-slate-200 p-3 bg-slate-50/40 text-sm flex items-center gap-2">
@@ -144,14 +144,14 @@ export default function About() {
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">What this is</h3>
             <p className="mt-2 text-sm text-slate-700">
-              A map-first event browser focused on practical decision-making. It is designed to help people quickly
-              answer: what is on, where it is, and whether it fits their day.
+              A map-first event browser focused on practical decisions. It is designed to help people answer quickly:
+              what is on, where it is, and whether it suits the day.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">How it works</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Events are filtered by date, map area, category, and cost. Fire votes provide positive ranking signal,
+              Events are filtered by date, map area, category, and cost. Fire votes add positive ranking signal,
               and the map and list stay in sync as you move across locations.
             </p>
           </article>
@@ -159,14 +159,14 @@ export default function About() {
             <h3 className="font-semibold text-lg">Trust and quality</h3>
             <p className="mt-2 text-sm text-slate-700">
               Data comes from trusted feeds where available plus user submissions. User submissions are held for
-              moderation before approval, and source links are shown to support verification.
+              moderation before approval, and source links are shown so details can be checked quickly.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">Why it exists</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Most people have limited time and too much fragmented information. This service exists to reduce planning
-              friction and make time off easier to use well.
+              Most people have limited free time and too much fragmented information. This service exists to reduce
+              planning friction and make days off easier to use well.
             </p>
           </article>
         </section>
@@ -174,7 +174,7 @@ export default function About() {
         <section className="rounded-3xl bg-[#14213d] text-white p-6 shadow-sm">
           <h3 className="text-xl font-semibold">Become a local insider</h3>
           <p className="mt-2 text-sm text-white/90">
-            First month free. Then £1/month. Supports feed quality, moderation, and ongoing improvements.
+            First month free. Then £1/month. This supports feed quality, moderation, and ongoing improvements.
           </p>
           <p className="mt-2 text-xs text-white/75">
             Live now: {stats.weekly} events this week across {stats.cities} cities.
