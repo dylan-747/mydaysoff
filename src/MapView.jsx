@@ -132,7 +132,7 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
 
     const latLng = marker.getLatLng();
     map.flyTo(latLng, Math.max(map.getZoom(), 9), { duration: 0.5 });
-  }, [focusEventId]);
+  }, [focusEventId, events, heatMode, selectedEventId]);
 
   return <div ref={containerRef} className="absolute inset-0 rounded-3xl" />;
 }

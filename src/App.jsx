@@ -258,20 +258,14 @@ export default function App() {
   const visibleEvents = useMemo(() => dayFiltered.filter((event) => inBounds(event, mapBounds)), [dayFiltered, mapBounds]);
   const listEvents = visibleEvents.length > 0 ? visibleEvents : dayFiltered;
   const navigationEvents = useMemo(() => {
-    return [...events]
-      .filter((e) => {
-        const matchCat = !category || (e.category || []).includes(category);
-        const matchCost = !cost || e.cost === cost;
-        return matchCat && matchCost;
-      })
+    return [...dayFiltered]
+      .filter((event) => hasCoords(event))
       .sort((a, b) => {
-        const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
-        if (dateCmp !== 0) return dateCmp;
         const timeCmp = String(a.time || "").localeCompare(String(b.time || ""));
         if (timeCmp !== 0) return timeCmp;
         return String(a.name || "").localeCompare(String(b.name || ""));
       });
-  }, [events, category, cost]);
+  }, [dayFiltered]);
   const selectedNavIndex = useMemo(
     () => (selectedEvent ? navOrderIds.findIndex((id) => id === selectedEvent.id) : -1),
     [navOrderIds, selectedEvent],
@@ -282,6 +276,28 @@ export default function App() {
     const inDayFiltered = dayFiltered.some((event) => event.id === selectedEvent.id);
     return inDayFiltered ? dayFiltered : [...dayFiltered, selectedEvent];
   }, [dayFiltered, selectedEvent]);
+
+  useEffect(() => {
+    if (!selectedEvent) return;
+    const match = dayFiltered.find((event) => event.id === selectedEvent.id);
+    if (match) {
+      if (match !== selectedEvent) setSelectedEvent(match);
+      return;
+    }
+    setSelectedEvent(null);
+    setFocusedEventId(null);
+    setNavOrderIds([]);
+  }, [dayFiltered, selectedEvent]);
+
+  useEffect(() => {
+    setNavOrderIds((prev) => {
+      if (!prev.length) return prev;
+      const allowed = new Set(navigationEvents.map((event) => event.id));
+      const next = prev.filter((id) => allowed.has(id));
+      if (next.length === prev.length) return prev;
+      return next;
+    });
+  }, [navigationEvents]);
 
   async function toggleLike(id) {
     try {
@@ -314,10 +330,6 @@ export default function App() {
     if (!event) return;
     setSelectedEvent(event);
     setFocusedEventId(event.id);
-    const dayIdx = days.findIndex((d) => ymd(d) === event.start_date);
-    if (dayIdx >= 0 && dayIdx !== selectedIndex) {
-      setSelectedIndex(dayIdx);
-    }
     if (rebuildNav) {
       buildNearestOrder(event);
     }
@@ -373,7 +385,7 @@ export default function App() {
     const currentIndex = orderIds.findIndex((id) => id === selectedEvent.id);
     const nextIndex = (currentIndex + step + orderIds.length) % orderIds.length;
     const nextId = orderIds[nextIndex];
-    const nextEvent = navigationEvents.find((event) => event.id === nextId);
+    const nextEvent = dayFiltered.find((event) => event.id === nextId);
     if (!nextEvent) return;
     selectEvent(nextEvent, { rebuildNav: false });
   }
