@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getAdminQuality, getPendingSubmissions, ingestPopular, setEventStatus, updateAdminEvent } from "../lib/api.js";
+import { getAdminQuality, getPendingSubmissions, setEventStatus, updateAdminEvent } from "../lib/api.js";
 
 export default function Admin() {
   const [token, setToken] = useState("");
@@ -26,15 +26,6 @@ export default function Admin() {
       setMessage(`Marked ${id} as ${status}.`);
     } catch (err) {
       setMessage(err.message || "Could not update status.");
-    }
-  }
-
-  async function importPopular() {
-    try {
-      const result = await ingestPopular(token);
-      setMessage(`Imported ${result.imported} curated events.`);
-    } catch (err) {
-      setMessage(err.message || "Could not ingest events.");
     }
   }
 
@@ -140,9 +131,6 @@ export default function Admin() {
           </label>
           <button onClick={load} className="rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-slate-50">
             Load Pending
-          </button>
-          <button onClick={importPopular} className="rounded-xl px-4 py-2 text-sm font-semibold bg-[#ff6a3d] text-white">
-            Import Popular Events
           </button>
           <button onClick={loadQuality} className="rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-slate-50">
             Quality Report

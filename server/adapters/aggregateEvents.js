@@ -3,6 +3,7 @@ import { getCivicEvents } from "./sources/civicEvents.js";
 import { getCultureEvents } from "./sources/cultureEvents.js";
 import { getTicketmasterEvents } from "./sources/ticketmasterEvents.js";
 import { getFeedRegistryEvents } from "./sources/feedRegistryEvents.js";
+import { getOpenActiveEvents } from "./sources/openActiveEvents.js";
 import { getPopularEventSeeds } from "./popularEvents.js";
 
 const DEFAULT_MIN_WEEKLY_EVENTS = 220;
@@ -259,10 +260,14 @@ function ensureCategoryCoverage(
 }
 
 export async function getCuratedEvents() {
-  const [ticketmaster, feedRegistry] = await Promise.all([getTicketmasterEvents(), getFeedRegistryEvents()]);
+  const [ticketmaster, feedRegistry, openActive] = await Promise.all([
+    getTicketmasterEvents(),
+    getFeedRegistryEvents(),
+    getOpenActiveEvents(),
+  ]);
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
   const minWeeklyEvents = Number(process.env.MIN_WEEKLY_EVENTS || DEFAULT_MIN_WEEKLY_EVENTS);
-  const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster]);
+  const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster, ...openActive]);
 
   const staticSample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents()];
   const popularSeeds = getPopularEventSeeds();

@@ -50,7 +50,9 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - Frontend auto-refreshes event feed every 60 seconds.
 - Admin import still exists for manual force-refresh, but is optional now.
 - If `TICKETMASTER_API_KEY` is set, Ticketmaster UK events are merged into the feed.
+- If `OPENACTIVE_FEEDS` is set (comma-separated JSON feed URLs), OpenActive activity listings are merged.
 - `server/sources/registry.json` controls trusted feed sources (NHS/council/partners).
+- `server/sources/openactive.json` can hold OpenActive source definitions (used when `OPENACTIVE_FEEDS` is empty).
 - Each event stores proof fields (source listing URL, feed URL, verification status, last seen).
 - Ingest now enforces per-day city caps and category coverage targets for filter diversity.
 - Link health checks run in background (`LINK_CHECK_INTERVAL_MS`) and track dead-link rates by source.

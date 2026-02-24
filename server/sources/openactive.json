@@ -1,0 +1,10 @@
+[
+  {
+    "id": "openactive_example",
+    "name": "OpenActive Provider Feed",
+    "url": "",
+    "trust": "trusted-partner",
+    "categoryHint": ["wellbeing", "sports"],
+    "city": "UK"
+  }
+]

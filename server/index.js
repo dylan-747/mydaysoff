@@ -79,6 +79,7 @@ function publicSourceLabel(source, trust) {
   const raw = String(source || "").toLowerCase().trim();
   if (!raw) return String(trust || "trusted-partner").toLowerCase();
   if (raw.includes("curated-api-seed") || raw === "seed") return "community-curated";
+  if (raw.includes("openactive")) return "openactive";
   if (raw === "ticketmaster") return "ticketmaster";
   if (raw.includes("nhs")) return "nhs";
   if (raw.includes("civic")) return "local-civic";
