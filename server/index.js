@@ -42,6 +42,17 @@ function cleanText(value) {
     .trim();
 }
 
+function publicSourceLabel(source, trust) {
+  const raw = String(source || "").toLowerCase().trim();
+  if (!raw) return String(trust || "trusted-partner").toLowerCase();
+  if (raw.includes("curated-api-seed") || raw === "seed") return "community-curated";
+  if (raw === "ticketmaster") return "ticketmaster";
+  if (raw.includes("nhs")) return "nhs";
+  if (raw.includes("civic")) return "local-civic";
+  if (raw.includes("community-partner")) return "community-partner";
+  return raw.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 function summarizeEvent(input) {
   const name = cleanText(input.name || "event");
   const city = cleanText(input.city || "");
@@ -179,7 +190,7 @@ function formatEvent(row) {
     lng: Number(row.lng),
     likes: Number(row.votes || 0),
     status: row.status,
-    source: row.source,
+    source: publicSourceLabel(row.source, row.source_trust),
   });
   event.summary = summarizeEvent(event);
   return event;

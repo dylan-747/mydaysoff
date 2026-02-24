@@ -675,9 +675,7 @@ export default function App() {
                       <span className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
                         🔎 {verificationLabel(e.verification_status)}
                       </span>
-                      {e.source && (
-                        <span className="text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 lowercase">source: {e.source}</span>
-                      )}
+                      <span className="text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 lowercase">source: {e.source_trust || "trusted-partner"}</span>
                       <span className="text-[10px] rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 lowercase">
                         {formatAudience(e.audience?.length ? e.audience : ["all-ages"])}
                       </span>

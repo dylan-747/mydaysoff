@@ -12,35 +12,181 @@ function normalizeName(name) {
     .trim();
 }
 
+function normalizeCity(city) {
+  return String(city || "uk")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeVenue(venue) {
+  return String(venue || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function hasGoodUrl(url) {
+  const value = String(url || "").trim();
+  return /^https?:\/\//i.test(value) && value !== "#";
+}
+
+function daysUntil(dateStr) {
+  const raw = String(dateStr || "");
+  if (!raw) return 365;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(raw);
+  day.setHours(0, 0, 0, 0);
+  if (Number.isNaN(day.valueOf())) return 365;
+  return Math.round((day.valueOf() - today.valueOf()) / (24 * 60 * 60 * 1000));
+}
+
+function trustScore(event) {
+  const trust = String(event?.source_trust || "");
+  if (trust === "official") return 40;
+  if (trust === "trusted-partner") return 28;
+  if (trust === "community") return 16;
+  return 8;
+}
+
+function verificationScore(event) {
+  const status = String(event?.verification_status || "");
+  if (status === "ticketmaster-listing") return 22;
+  if (status === "feed-listing") return 20;
+  if (status === "community-submitted") return 12;
+  return 6;
+}
+
+function completenessScore(event) {
+  let score = 0;
+  if (Number.isFinite(Number(event?.lat)) && Number.isFinite(Number(event?.lng))) score += 12;
+  if (String(event?.venue || "").trim()) score += 8;
+  if (String(event?.time || "").trim()) score += 5;
+  if (hasGoodUrl(event?.source_event_url || event?.url)) score += 12;
+  if (String(event?.city || "").trim()) score += 3;
+  const summaryLen = String(event?.summary || "").trim().length;
+  if (summaryLen >= 40) score += 4;
+  return score;
+}
+
+function freshnessScore(event) {
+  const delta = daysUntil(event?.start_date);
+  if (delta < 0) return -20;
+  if (delta <= 2) return 16;
+  if (delta <= 7) return 12;
+  if (delta <= 14) return 8;
+  if (delta <= 30) return 5;
+  return 2;
+}
+
+function qualityScore(event) {
+  const popularity = Math.max(0, Number(event?.popularity || 0));
+  return trustScore(event) + verificationScore(event) + completenessScore(event) + freshnessScore(event) + Math.min(popularity, 20);
+}
+
+function mergeEvents(existing, event) {
+  return {
+    ...existing,
+    ...event,
+    popularity: Math.max(Number(existing.popularity || 0), Number(event.popularity || 0)),
+    category: Array.from(new Set([...(existing.category || []), ...(event.category || [])])),
+    accessibility: Array.from(new Set([...(existing.accessibility || []), ...(event.accessibility || [])])),
+    audience: Array.from(new Set([...(existing.audience || []), ...(event.audience || [])])),
+    source_trust: trustScore(event) > trustScore(existing) ? event.source_trust : existing.source_trust,
+    verification_status:
+      verificationScore(event) > verificationScore(existing) ? event.verification_status : existing.verification_status,
+  };
+}
+
 function dedupeEvents(events) {
   const map = new Map();
   for (const event of events) {
-    const key = `${event.city}|${event.start_date}|${normalizeName(event.name)}`;
+    const key = `${normalizeCity(event.city)}|${String(event.start_date || "")}|${normalizeName(event.name)}|${normalizeVenue(event.venue)}`;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, event);
       continue;
     }
 
-    map.set(key, {
-      ...existing,
-      popularity: Math.max(Number(existing.popularity || 0), Number(event.popularity || 0)),
-      category: Array.from(new Set([...(existing.category || []), ...(event.category || [])])),
-      accessibility: Array.from(new Set([...(existing.accessibility || []), ...(event.accessibility || [])])),
-      source: `${existing.source},${event.source}`,
-      source_trust: existing.source_trust === "official" || event.source_trust === "official" ? "official" : "trusted-partner",
-    });
+    const winner = qualityScore(event) > qualityScore(existing) ? event : existing;
+    map.set(key, mergeEvents(winner, winner === event ? existing : event));
   }
   return Array.from(map.values());
+}
+
+function selectBalanced(events, { maxTotal = 380, perDayLimit = 44, perDayCityLimit = 5, perDayCategoryLimit = 10 } = {}) {
+  const sorted = [...events].sort((a, b) => qualityScore(b) - qualityScore(a));
+  const selected = [];
+  const dayCounts = new Map();
+  const dayCityCounts = new Map();
+  const dayCategoryCounts = new Map();
+
+  for (const event of sorted) {
+    if (selected.length >= maxTotal) break;
+    const day = String(event.start_date || "");
+    const city = normalizeCity(event.city);
+    const categories = Array.isArray(event.category) && event.category.length ? event.category : ["community"];
+
+    const dayCount = dayCounts.get(day) || 0;
+    if (dayCount >= perDayLimit) continue;
+
+    const dayCityKey = `${day}|${city}`;
+    const cityCount = dayCityCounts.get(dayCityKey) || 0;
+    if (cityCount >= perDayCityLimit) continue;
+
+    let blockedByCategory = false;
+    for (const category of categories) {
+      const dayCategoryKey = `${day}|${String(category || "community").toLowerCase()}`;
+      const categoryCount = dayCategoryCounts.get(dayCategoryKey) || 0;
+      if (categoryCount >= perDayCategoryLimit) {
+        blockedByCategory = true;
+        break;
+      }
+    }
+    if (blockedByCategory) continue;
+
+    selected.push(event);
+    dayCounts.set(day, dayCount + 1);
+    dayCityCounts.set(dayCityKey, cityCount + 1);
+    for (const category of categories) {
+      const dayCategoryKey = `${day}|${String(category || "community").toLowerCase()}`;
+      dayCategoryCounts.set(dayCategoryKey, (dayCategoryCounts.get(dayCategoryKey) || 0) + 1);
+    }
+  }
+
+  return selected.length ? selected : sorted.slice(0, maxTotal);
 }
 
 export async function getCuratedEvents() {
   const [ticketmaster, feedRegistry] = await Promise.all([getTicketmasterEvents(), getFeedRegistryEvents()]);
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
-  const sample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents(), ...getPopularEventSeeds()];
-  const mergedReal = [...feedRegistry, ...ticketmaster];
-  // Keep the feed feeling alive even when upstream APIs are sparse.
-  const shouldBlendSample = includeSample || mergedReal.length < 120;
-  const merged = mergedReal.length > 0 ? [...mergedReal, ...(shouldBlendSample ? sample : [])] : sample;
-  return dedupeEvents(merged);
+  const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster]);
+
+  const staticSample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents()];
+  const popularSeeds = getPopularEventSeeds();
+
+  // Use static trusted sample first; only blend large synthetic seed pools when real data is sparse.
+  const useStaticSample = includeSample || mergedReal.length < 160;
+  const usePopularSeeds = includeSample || mergedReal.length < 80;
+  const seedCap = mergedReal.length < 50 ? 90 : 45;
+  const blended = [
+    ...mergedReal,
+    ...(useStaticSample ? staticSample : []),
+    ...(usePopularSeeds ? popularSeeds.slice(0, seedCap) : []),
+  ];
+
+  const deduped = dedupeEvents(blended);
+  const balanced = selectBalanced(deduped, {
+    maxTotal: mergedReal.length > 0 ? 420 : 320,
+    perDayLimit: mergedReal.length > 0 ? 54 : 38,
+    perDayCityLimit: mergedReal.length > 0 ? 6 : 4,
+    perDayCategoryLimit: 10,
+  });
+
+  return balanced.sort((a, b) => {
+    const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
+    if (dateCmp !== 0) return dateCmp;
+    return qualityScore(b) - qualityScore(a);
+  });
 }
