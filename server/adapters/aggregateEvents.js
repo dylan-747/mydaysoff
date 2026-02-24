@@ -5,6 +5,8 @@ import { getTicketmasterEvents } from "./sources/ticketmasterEvents.js";
 import { getFeedRegistryEvents } from "./sources/feedRegistryEvents.js";
 import { getPopularEventSeeds } from "./popularEvents.js";
 
+const DEFAULT_MIN_WEEKLY_EVENTS = 220;
+
 function normalizeName(name) {
   return String(name || "")
     .toLowerCase()
@@ -158,6 +160,40 @@ function selectBalanced(events, { maxTotal = 380, perDayLimit = 44, perDayCityLi
   return selected.length ? selected : sorted.slice(0, maxTotal);
 }
 
+function isWithinNextDays(dateStr, days = 6) {
+  const raw = String(dateStr || "");
+  if (!raw) return false;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + days);
+  const value = new Date(raw);
+  value.setHours(0, 0, 0, 0);
+  if (Number.isNaN(value.valueOf())) return false;
+  return value >= start && value <= end;
+}
+
+function ensureWeeklyMinimum(selected, pool, { minWeekly = DEFAULT_MIN_WEEKLY_EVENTS, windowDays = 6 } = {}) {
+  if (minWeekly <= 0) return selected;
+  const selectedIds = new Set(selected.map((event) => event.id));
+  let weeklyCount = selected.filter((event) => isWithinNextDays(event.start_date, windowDays)).length;
+  if (weeklyCount >= minWeekly) return selected;
+
+  const additions = [...pool]
+    .filter((event) => !selectedIds.has(event.id))
+    .filter((event) => isWithinNextDays(event.start_date, windowDays))
+    .sort((a, b) => qualityScore(b) - qualityScore(a));
+
+  const next = [...selected];
+  for (const event of additions) {
+    if (weeklyCount >= minWeekly) break;
+    next.push(event);
+    selectedIds.add(event.id);
+    weeklyCount += 1;
+  }
+  return next;
+}
+
 function ensureCategoryCoverage(
   selected,
   pool,
@@ -225,6 +261,7 @@ function ensureCategoryCoverage(
 export async function getCuratedEvents() {
   const [ticketmaster, feedRegistry] = await Promise.all([getTicketmasterEvents(), getFeedRegistryEvents()]);
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
+  const minWeeklyEvents = Number(process.env.MIN_WEEKLY_EVENTS || DEFAULT_MIN_WEEKLY_EVENTS);
   const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster]);
 
   const staticSample = [...getNhsEvents(), ...getCivicEvents(), ...getCultureEvents()];
@@ -233,7 +270,8 @@ export async function getCuratedEvents() {
   // Use static trusted sample first; only blend large synthetic seed pools when real data is sparse.
   const useStaticSample = includeSample || mergedReal.length < 160;
   const usePopularSeeds = includeSample || mergedReal.length < 80;
-  const seedCap = mergedReal.length < 50 ? 90 : 45;
+  const baseSeedCap = mergedReal.length < 50 ? 90 : 45;
+  const seedCap = Math.max(baseSeedCap, Math.ceil(minWeeklyEvents * 1.4));
   const blended = [
     ...mergedReal,
     ...(useStaticSample ? staticSample : []),
@@ -252,8 +290,12 @@ export async function getCuratedEvents() {
     ...balanceOptions,
     requiredCategories: ["family", "outdoors", "market", "sports", "music", "charity", "wellbeing"],
   });
+  const weeklyGuaranteed = ensureWeeklyMinimum(covered, deduped, {
+    minWeekly: minWeeklyEvents,
+    windowDays: 6,
+  });
 
-  return covered.sort((a, b) => {
+  return weeklyGuaranteed.sort((a, b) => {
     const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
     if (dateCmp !== 0) return dateCmp;
     return qualityScore(b) - qualityScore(a);
