@@ -11,6 +11,12 @@ const port = Number(process.env.PORT || 8787);
 const adminToken = process.env.ADMIN_TOKEN || "dev-admin-token";
 const refreshMs = Number(process.env.INGEST_REFRESH_MS || 15 * 60 * 1000);
 const stripeTrialDays = Number(process.env.STRIPE_TRIAL_DAYS || 30);
+const linkCheckIntervalMs = Number(process.env.LINK_CHECK_INTERVAL_MS || 3 * 60 * 60 * 1000);
+const linkCheckMaxPerRun = Number(process.env.LINK_CHECK_MAX_PER_RUN || 40);
+const linkCheckStaleHours = Number(process.env.LINK_CHECK_STALE_HOURS || 24);
+
+let lastLinkCheckAt = 0;
+let qualityMonitorRunning = false;
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -40,6 +46,33 @@ function cleanText(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function hasRealUrl(url) {
+  const value = String(url || "").trim();
+  return /^https?:\/\//i.test(value) && value !== "#";
+}
+
+function qualityScoreLite(event) {
+  let score = 0;
+  const trust = String(event?.source_trust || "");
+  if (trust === "official") score += 40;
+  else if (trust === "trusted-partner") score += 28;
+  else if (trust === "community") score += 16;
+  else score += 8;
+
+  const verification = String(event?.verification_status || "");
+  if (verification === "ticketmaster-listing") score += 22;
+  else if (verification === "feed-listing") score += 20;
+  else if (verification === "community-submitted") score += 12;
+  else score += 6;
+
+  if (Number.isFinite(Number(event?.lat)) && Number.isFinite(Number(event?.lng))) score += 10;
+  if (String(event?.venue || "").trim()) score += 8;
+  if (String(event?.time || "").trim()) score += 5;
+  if (hasRealUrl(event?.source_event_url || event?.url)) score += 12;
+  score += Math.min(15, Math.max(0, Number(event?.likes || event?.popularity || 0)));
+  return score;
 }
 
 function publicSourceLabel(source, trust) {
@@ -251,6 +284,25 @@ const ensureVoteRowWithPopularity = db.prepare(`
   ON CONFLICT(event_id) DO NOTHING
 `);
 
+const upsertLinkCheck = db.prepare(`
+  INSERT INTO event_link_checks (event_id, checked_at, status_code, ok, final_url, error)
+  VALUES (@event_id, @checked_at, @status_code, @ok, @final_url, @error)
+  ON CONFLICT(event_id) DO UPDATE SET
+    checked_at = excluded.checked_at,
+    status_code = excluded.status_code,
+    ok = excluded.ok,
+    final_url = excluded.final_url,
+    error = excluded.error
+`);
+
+const insertSourceHealthSnapshot = db.prepare(`
+  INSERT OR REPLACE INTO source_health_snapshots (
+    source_id, observed_at, event_count, avg_quality, dead_link_rate, sample_size
+  ) VALUES (
+    @source_id, @observed_at, @event_count, @avg_quality, @dead_link_rate, @sample_size
+  )
+`);
+
 const upsertNewsletterSubscriber = db.prepare(`
   INSERT INTO newsletter_subscribers (email, city, interests_json, source, status, updated_at)
   VALUES (@email, @city, @interests_json, @source, 'active', CURRENT_TIMESTAMP)
@@ -284,7 +336,122 @@ async function ingestCuratedEvents() {
     }
   });
   tx(incoming);
+  queueQualityMonitor();
   return incoming.length;
+}
+
+async function fetchUrlStatus(url) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+  try {
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "HEAD",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: { "User-Agent": "mydaysoff-linkcheck/1.0" },
+      });
+    } catch {
+      response = await fetch(url, {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: { "User-Agent": "mydaysoff-linkcheck/1.0", Range: "bytes=0-0" },
+      });
+    }
+    return {
+      ok: response.ok,
+      statusCode: Number(response.status || 0),
+      finalUrl: response.url || url,
+      error: "",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 0,
+      finalUrl: url,
+      error: String(error?.name || error?.message || "fetch_failed"),
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function runQualityMonitor({ force = false } = {}) {
+  if (qualityMonitorRunning) return;
+  qualityMonitorRunning = true;
+  try {
+    const now = Date.now();
+    if (!force && now - lastLinkCheckAt < linkCheckIntervalMs) return;
+    lastLinkCheckAt = now;
+
+    const staleThresholdIso = new Date(Date.now() - linkCheckStaleHours * 60 * 60 * 1000).toISOString();
+    const candidates = db
+      .prepare(
+        `
+      SELECT e.id, e.source, e.source_trust, e.verification_status, e.venue, e.time, e.city, e.lat, e.lng,
+             e.url, e.source_event_url, e.start_date, COALESCE(v.count, 0) AS likes,
+             lc.checked_at AS link_checked_at
+      FROM events e
+      LEFT JOIN votes v ON v.event_id = e.id
+      LEFT JOIN event_link_checks lc ON lc.event_id = e.id
+      WHERE e.status = 'approved'
+        AND e.source != 'user'
+        AND e.start_date >= date('now')
+        AND (
+          lc.checked_at IS NULL OR lc.checked_at < @stale_threshold
+        )
+      ORDER BY e.start_date ASC, likes DESC
+      LIMIT @limit
+      `,
+      )
+      .all({ stale_threshold: staleThresholdIso, limit: linkCheckMaxPerRun });
+
+    const checkedAt = new Date().toISOString();
+    const sourceStats = new Map();
+    for (const event of candidates) {
+      const url = event.source_event_url || event.url;
+      const linkResult = hasRealUrl(url)
+        ? await fetchUrlStatus(url)
+        : { ok: false, statusCode: 0, finalUrl: "", error: "missing_or_invalid_url" };
+
+      upsertLinkCheck.run({
+        event_id: event.id,
+        checked_at: checkedAt,
+        status_code: linkResult.statusCode,
+        ok: linkResult.ok ? 1 : 0,
+        final_url: linkResult.finalUrl,
+        error: linkResult.error,
+      });
+
+      const sourceId = String(event.source || "unknown");
+      const prev = sourceStats.get(sourceId) || { count: 0, dead: 0, qualityTotal: 0 };
+      prev.count += 1;
+      prev.dead += linkResult.ok ? 0 : 1;
+      prev.qualityTotal += qualityScoreLite(event);
+      sourceStats.set(sourceId, prev);
+    }
+
+    for (const [sourceId, stats] of sourceStats.entries()) {
+      insertSourceHealthSnapshot.run({
+        source_id: sourceId,
+        observed_at: checkedAt,
+        event_count: stats.count,
+        avg_quality: Number((stats.qualityTotal / Math.max(1, stats.count)).toFixed(2)),
+        dead_link_rate: Number((stats.dead / Math.max(1, stats.count)).toFixed(3)),
+        sample_size: stats.count,
+      });
+    }
+  } finally {
+    qualityMonitorRunning = false;
+  }
+}
+
+function queueQualityMonitor(force = false) {
+  runQualityMonitor({ force }).catch((error) => {
+    console.error("Quality monitor failed", error);
+  });
 }
 
 app.get("/api/health", (_req, res) => {
@@ -480,6 +647,79 @@ app.post("/api/admin/ingest", requireAdmin, async (_req, res) => {
   return res.json({ ok: true, imported });
 });
 
+app.get("/api/admin/quality", requireAdmin, (_req, res) => {
+  const sources = db
+    .prepare(
+      `
+      SELECT s.source_id, s.observed_at, s.event_count, s.avg_quality, s.dead_link_rate, s.sample_size
+      FROM source_health_snapshots s
+      INNER JOIN (
+        SELECT source_id, MAX(observed_at) AS observed_at
+        FROM source_health_snapshots
+        GROUP BY source_id
+      ) latest
+      ON latest.source_id = s.source_id AND latest.observed_at = s.observed_at
+      ORDER BY s.dead_link_rate DESC, s.event_count DESC
+      `,
+    )
+    .all();
+
+  const deadLinks = db
+    .prepare(
+      `
+      SELECT e.id, e.name, e.city, e.start_date, e.source, e.source_event_url, e.url,
+             lc.checked_at, lc.status_code, lc.error
+      FROM event_link_checks lc
+      JOIN events e ON e.id = lc.event_id
+      WHERE lc.ok = 0
+      ORDER BY lc.checked_at DESC
+      LIMIT 25
+      `,
+    )
+    .all();
+
+  const coverageRows = db
+    .prepare(
+      `
+      SELECT start_date, category_json
+      FROM events
+      WHERE status = 'approved' AND start_date >= date('now') AND start_date <= date('now', '+14 day')
+      `,
+    )
+    .all();
+
+  const requiredCategories = ["family", "outdoors", "market", "sports", "music", "charity", "wellbeing"];
+  const coverageByDay = new Map();
+  for (const row of coverageRows) {
+    const day = String(row.start_date || "");
+    if (!coverageByDay.has(day)) coverageByDay.set(day, new Set());
+    const parsed = JSON.parse(row.category_json || "[]");
+    for (const category of parsed) {
+      coverageByDay.get(day).add(String(category || "").toLowerCase());
+    }
+  }
+
+  const coverage = Array.from(coverageByDay.entries())
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+    .map(([day, set]) => {
+      const present = requiredCategories.filter((category) => set.has(category));
+      const missing = requiredCategories.filter((category) => !set.has(category));
+      return {
+        day,
+        present_count: present.length,
+        missing,
+      };
+    });
+
+  return res.json({
+    ok: true,
+    generated_at: new Date().toISOString(),
+    sources,
+    dead_links: deadLinks,
+    category_coverage: coverage,
+  });
+});
+
 app.post("/api/geocode/what3words", async (req, res) => {
   const apiKey = process.env.WHAT3WORDS_API_KEY;
   const words = String(req.body?.words || "").trim().replace(/^\/+/, "");
@@ -563,6 +803,10 @@ app.listen(port, async () => {
       console.error("Scheduled ingest failed", error);
     }
   }, refreshMs).unref();
+  setInterval(() => {
+    queueQualityMonitor(false);
+  }, linkCheckIntervalMs).unref();
+  queueQualityMonitor(true);
 
   console.log(`MyDaysOff API listening on http://localhost:${port}`);
   console.log(`Auto-ingested curated events: ${imported} (refresh every ${Math.round(refreshMs / 60000)} min)`);

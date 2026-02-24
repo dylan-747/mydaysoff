@@ -81,6 +81,12 @@ export function ingestPopular(adminToken) {
   });
 }
 
+export function getAdminQuality(adminToken) {
+  return request("/api/admin/quality", {
+    headers: { "x-admin-token": adminToken },
+  });
+}
+
 export function signupNewsletter(payload) {
   return request("/api/newsletter/signup", {
     method: "POST",

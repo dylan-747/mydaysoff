@@ -52,6 +52,8 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - If `TICKETMASTER_API_KEY` is set, Ticketmaster UK events are merged into the feed.
 - `server/sources/registry.json` controls trusted feed sources (NHS/council/partners).
 - Each event stores proof fields (source listing URL, feed URL, verification status, last seen).
+- Ingest now enforces per-day city caps and category coverage targets for filter diversity.
+- Link health checks run in background (`LINK_CHECK_INTERVAL_MS`) and track dead-link rates by source.
 
 ## API Endpoints
 
@@ -61,6 +63,7 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - `GET /api/admin/submissions` (admin)
 - `PATCH /api/admin/events/:id/status` (admin approve/reject)
 - `POST /api/admin/ingest` (admin import curated source events)
+- `GET /api/admin/quality` (admin source health, dead links, category coverage)
 - `POST /api/geocode/what3words` (needs `WHAT3WORDS_API_KEY`)
 - `POST /api/stripe/checkout` (needs Stripe env keys, includes trial support)
 

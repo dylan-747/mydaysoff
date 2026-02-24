@@ -65,6 +65,25 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS source_health_snapshots (
+    source_id TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    avg_quality REAL NOT NULL DEFAULT 0,
+    dead_link_rate REAL NOT NULL DEFAULT 0,
+    sample_size INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(source_id, observed_at)
+  );
+
+  CREATE TABLE IF NOT EXISTS event_link_checks (
+    event_id TEXT PRIMARY KEY,
+    checked_at TEXT NOT NULL,
+    status_code INTEGER,
+    ok INTEGER NOT NULL DEFAULT 0,
+    final_url TEXT,
+    error TEXT
+  );
 `);
 
 function ensureColumn(tableName, columnName, columnType) {

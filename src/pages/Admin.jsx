@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getPendingSubmissions, ingestPopular, setEventStatus, updateAdminEvent } from "../lib/api.js";
+import { getAdminQuality, getPendingSubmissions, ingestPopular, setEventStatus, updateAdminEvent } from "../lib/api.js";
 
 export default function Admin() {
   const [token, setToken] = useState("");
@@ -7,6 +7,7 @@ export default function Admin() {
   const [message, setMessage] = useState("Enter admin token and load submissions.");
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(null);
+  const [quality, setQuality] = useState(null);
 
   async function load() {
     try {
@@ -34,6 +35,16 @@ export default function Admin() {
       setMessage(`Imported ${result.imported} curated events.`);
     } catch (err) {
       setMessage(err.message || "Could not ingest events.");
+    }
+  }
+
+  async function loadQuality() {
+    try {
+      const data = await getAdminQuality(token);
+      setQuality(data);
+      setMessage("Loaded source quality report.");
+    } catch (err) {
+      setMessage(err.message || "Could not load quality report.");
     }
   }
 
@@ -133,9 +144,56 @@ export default function Admin() {
           <button onClick={importPopular} className="rounded-xl px-4 py-2 text-sm font-semibold bg-[#ff6a3d] text-white">
             Import Popular Events
           </button>
+          <button onClick={loadQuality} className="rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+            Quality Report
+          </button>
         </div>
 
         <div className="text-sm text-slate-600">{message}</div>
+
+        {quality && (
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Ingest Quality Snapshot</h2>
+              <span className="text-xs text-slate-500">{new Date(quality.generated_at).toLocaleString()}</span>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              {(quality.sources || []).map((source) => (
+                <div key={source.source_id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                  <div className="font-semibold lowercase">{source.source_id}</div>
+                  <div className="text-slate-600">
+                    {source.event_count} checked • avg quality {source.avg_quality} • dead-link rate{" "}
+                    {Math.round(Number(source.dead_link_rate || 0) * 100)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Missing categories in next 14 days</h3>
+              <div className="mt-1 space-y-1 text-xs text-slate-600">
+                {(quality.category_coverage || [])
+                  .filter((row) => (row.missing || []).length > 0)
+                  .slice(0, 12)
+                  .map((row) => (
+                    <div key={`cov-${row.day}`} className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">
+                      {row.day}: missing {(row.missing || []).join(", ")}
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Recent dead links</h3>
+              <div className="mt-1 space-y-1 text-xs text-slate-600">
+                {(quality.dead_links || []).slice(0, 10).map((item) => (
+                  <div key={`dead-${item.id}`} className="rounded-lg border border-slate-200 px-2 py-1">
+                    {item.start_date} • {item.city} • {item.name} • {item.status_code || item.error || "unreachable"}
+                  </div>
+                ))}
+                {(!quality.dead_links || quality.dead_links.length === 0) && <div className="text-slate-500">No dead links in latest checks.</div>}
+              </div>
+            </div>
+          </section>
+        )}
 
         <div className="space-y-3">
           {items.map((event) => (

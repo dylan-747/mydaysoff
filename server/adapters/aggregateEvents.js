@@ -158,6 +158,70 @@ function selectBalanced(events, { maxTotal = 380, perDayLimit = 44, perDayCityLi
   return selected.length ? selected : sorted.slice(0, maxTotal);
 }
 
+function ensureCategoryCoverage(
+  selected,
+  pool,
+  { requiredCategories = [], perDayLimit = 44, perDayCityLimit = 5, perDayCategoryLimit = 10 } = {},
+) {
+  if (!requiredCategories.length || !selected.length) return selected;
+
+  const selectedById = new Map(selected.map((event) => [event.id, event]));
+  const byDay = new Map();
+  for (const event of selected) {
+    const day = String(event.start_date || "");
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(event);
+  }
+
+  const poolByDay = new Map();
+  for (const event of pool) {
+    const day = String(event.start_date || "");
+    if (!poolByDay.has(day)) poolByDay.set(day, []);
+    poolByDay.get(day).push(event);
+  }
+
+  for (const [day, daySelected] of byDay.entries()) {
+    const dayPool = poolByDay.get(day) || [];
+    if (!dayPool.length) continue;
+
+    for (const category of requiredCategories) {
+      const hasCategory = daySelected.some((event) => (event.category || []).map((c) => String(c).toLowerCase()).includes(category));
+      if (hasCategory) continue;
+
+      const candidates = dayPool
+        .filter((event) => !selectedById.has(event.id))
+        .filter((event) => (event.category || []).map((c) => String(c).toLowerCase()).includes(category))
+        .sort((a, b) => qualityScore(b) - qualityScore(a));
+      if (!candidates.length) continue;
+
+      const candidate = candidates[0];
+      const cityKey = normalizeCity(candidate.city);
+      const dayCityCount = daySelected.filter((event) => normalizeCity(event.city) === cityKey).length;
+      const dayCategoryCount = daySelected.filter((event) =>
+        (event.category || []).map((c) => String(c).toLowerCase()).includes(category),
+      ).length;
+
+      if (daySelected.length < perDayLimit && dayCityCount < perDayCityLimit && dayCategoryCount < perDayCategoryLimit) {
+        daySelected.push(candidate);
+        selectedById.set(candidate.id, candidate);
+        continue;
+      }
+
+      const replaceIdx = daySelected
+        .map((event, idx) => ({ event, idx }))
+        .filter(({ event }) => !(event.category || []).map((c) => String(c).toLowerCase()).includes(category))
+        .sort((a, b) => qualityScore(a.event) - qualityScore(b.event))[0]?.idx;
+      if (replaceIdx === undefined) continue;
+
+      selectedById.delete(daySelected[replaceIdx].id);
+      daySelected[replaceIdx] = candidate;
+      selectedById.set(candidate.id, candidate);
+    }
+  }
+
+  return Array.from(selectedById.values());
+}
+
 export async function getCuratedEvents() {
   const [ticketmaster, feedRegistry] = await Promise.all([getTicketmasterEvents(), getFeedRegistryEvents()]);
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
@@ -177,14 +241,19 @@ export async function getCuratedEvents() {
   ];
 
   const deduped = dedupeEvents(blended);
-  const balanced = selectBalanced(deduped, {
+  const balanceOptions = {
     maxTotal: mergedReal.length > 0 ? 420 : 320,
     perDayLimit: mergedReal.length > 0 ? 54 : 38,
     perDayCityLimit: mergedReal.length > 0 ? 6 : 4,
     perDayCategoryLimit: 10,
+  };
+  const balanced = selectBalanced(deduped, balanceOptions);
+  const covered = ensureCategoryCoverage(balanced, deduped, {
+    ...balanceOptions,
+    requiredCategories: ["family", "outdoors", "market", "sports", "music", "charity", "wellbeing"],
   });
 
-  return balanced.sort((a, b) => {
+  return covered.sort((a, b) => {
     const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
     if (dateCmp !== 0) return dateCmp;
     return qualityScore(b) - qualityScore(a);
