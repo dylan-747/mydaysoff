@@ -154,6 +154,17 @@ function inBounds(event, bounds) {
   return event.lat >= bounds.south && event.lat <= bounds.north && event.lng >= bounds.west && event.lng <= bounds.east;
 }
 
+function hasCoords(event) {
+  return Number.isFinite(event?.lat) && Number.isFinite(event?.lng);
+}
+
+function distanceSq(a, b) {
+  if (!hasCoords(a) || !hasCoords(b)) return Number.POSITIVE_INFINITY;
+  const dLat = Number(a.lat) - Number(b.lat);
+  const dLng = Number(a.lng) - Number(b.lng);
+  return dLat * dLat + dLng * dLng;
+}
+
 function formatIndoor(indoor) {
   if (indoor === "indoor") return "🏠 indoor";
   if (indoor === "outdoor") return "🌳 outdoor";
@@ -193,6 +204,7 @@ export default function App() {
   const [mapBounds, setMapBounds] = useState(null);
   const [focusedEventId, setFocusedEventId] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [navOrderIds, setNavOrderIds] = useState([]);
   const [newsletterOpen, setNewsletterOpen] = useState(false);
   const [newsletterStatus, setNewsletterStatus] = useState("");
   const [newsletterBusy, setNewsletterBusy] = useState(false);
@@ -261,10 +273,10 @@ export default function App() {
       });
   }, [events, category, cost]);
   const selectedNavIndex = useMemo(
-    () => (selectedEvent ? navigationEvents.findIndex((event) => event.id === selectedEvent.id) : -1),
-    [navigationEvents, selectedEvent],
+    () => (selectedEvent ? navOrderIds.findIndex((id) => id === selectedEvent.id) : -1),
+    [navOrderIds, selectedEvent],
   );
-  const canNavigate = selectedNavIndex >= 0 && navigationEvents.length > 1;
+  const canNavigate = selectedNavIndex >= 0 && navOrderIds.length > 1;
   const mapEvents = useMemo(() => {
     if (!selectedEvent) return dayFiltered;
     const inDayFiltered = dayFiltered.some((event) => event.id === selectedEvent.id);
@@ -278,6 +290,36 @@ export default function App() {
       setSelectedEvent((prev) => (prev && prev.id === id ? { ...prev, likes: result.likes } : prev));
     } catch (err) {
       setError(err.message || "Could not save vote");
+    }
+  }
+
+  function buildNearestOrder(anchorEvent) {
+    const byId = new Map(navigationEvents.map((event) => [event.id, event]));
+    const sorted = [...navigationEvents].sort((a, b) => {
+      const distCmp = distanceSq(a, anchorEvent) - distanceSq(b, anchorEvent);
+      if (distCmp !== 0) return distCmp;
+      const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
+      if (dateCmp !== 0) return dateCmp;
+      const timeCmp = String(a.time || "").localeCompare(String(b.time || ""));
+      if (timeCmp !== 0) return timeCmp;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+
+    const ids = sorted.map((event) => event.id).filter((id) => byId.has(id));
+    setNavOrderIds(ids);
+    return ids;
+  }
+
+  function selectEvent(event, { rebuildNav = true } = {}) {
+    if (!event) return;
+    setSelectedEvent(event);
+    setFocusedEventId(event.id);
+    const dayIdx = days.findIndex((d) => ymd(d) === event.start_date);
+    if (dayIdx >= 0 && dayIdx !== selectedIndex) {
+      setSelectedIndex(dayIdx);
+    }
+    if (rebuildNav) {
+      buildNearestOrder(event);
     }
   }
 
@@ -320,16 +362,20 @@ export default function App() {
   }
 
   function moveSelectedEvent(step) {
-    if (!canNavigate) return;
-    const nextIndex = (selectedNavIndex + step + navigationEvents.length) % navigationEvents.length;
-    const nextEvent = navigationEvents[nextIndex];
+    if (!selectedEvent) return;
+
+    const orderIds =
+      navOrderIds.length > 1 && selectedNavIndex >= 0
+        ? navOrderIds
+        : buildNearestOrder(selectedEvent);
+
+    if (!orderIds.length || orderIds.length < 2) return;
+    const currentIndex = orderIds.findIndex((id) => id === selectedEvent.id);
+    const nextIndex = (currentIndex + step + orderIds.length) % orderIds.length;
+    const nextId = orderIds[nextIndex];
+    const nextEvent = navigationEvents.find((event) => event.id === nextId);
     if (!nextEvent) return;
-    setSelectedEvent(nextEvent);
-    setFocusedEventId(nextEvent.id);
-    const dayIdx = days.findIndex((d) => ymd(d) === nextEvent.start_date);
-    if (dayIdx >= 0 && dayIdx !== selectedIndex) {
-      setSelectedIndex(dayIdx);
-    }
+    selectEvent(nextEvent, { rebuildNav: false });
   }
 
   return (
@@ -450,7 +496,7 @@ export default function App() {
               onBoundsChange={setMapBounds}
               focusEventId={focusedEventId}
               selectedEventId={selectedEvent?.id || null}
-              onEventSelect={setSelectedEvent}
+              onEventSelect={(event) => selectEvent(event, { rebuildNav: true })}
             />
           </div>
         </section>
@@ -585,10 +631,7 @@ export default function App() {
               listEvents.map((e) => (
                 <div
                   key={e.id}
-                  onClick={() => {
-                    setFocusedEventId(e.id);
-                    setSelectedEvent(e);
-                  }}
+                  onClick={() => selectEvent(e, { rebuildNav: true })}
                   className="grid grid-cols-[1fr_auto] gap-3 items-start p-3 rounded-2xl border border-slate-200 hover:shadow-sm transition"
                 >
                   <div>
