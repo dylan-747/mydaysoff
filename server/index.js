@@ -322,8 +322,16 @@ const unsubscribeNewsletterSubscriber = db.prepare(`
 `);
 
 async function ingestCuratedEvents() {
+  const liveOnly = process.env.LIVE_EVENTS_ONLY !== "false";
   const incoming = await getCuratedEvents();
   if (!incoming.length) {
+    if (liveOnly) {
+      const tx = db.transaction(() => {
+        db.prepare("DELETE FROM votes WHERE event_id IN (SELECT id FROM events WHERE source != 'user')").run();
+        db.prepare("DELETE FROM events WHERE source != 'user'").run();
+      });
+      tx();
+    }
     return 0;
   }
 
@@ -810,5 +818,6 @@ app.listen(port, async () => {
   queueQualityMonitor(true);
 
   console.log(`MyDaysOff API listening on http://localhost:${port}`);
+  console.log(`Live events only mode: ${process.env.LIVE_EVENTS_ONLY !== "false" ? "on" : "off"}`);
   console.log(`Auto-ingested curated events: ${imported} (refresh every ${Math.round(refreshMs / 60000)} min)`);
 });
