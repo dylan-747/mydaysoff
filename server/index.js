@@ -53,6 +53,14 @@ function hasRealUrl(url) {
   return /^https?:\/\//i.test(value) && value !== "#";
 }
 
+function isRestrictedButValidLink(source, statusCode) {
+  const sourceId = String(source || "").toLowerCase();
+  const code = Number(statusCode || 0);
+  if (!code) return false;
+  if (sourceId.includes("ticketmaster") && (code === 403 || code === 429 || code === 406)) return true;
+  return false;
+}
+
 function qualityScoreLite(event) {
   let score = 0;
   const trust = String(event?.source_trust || "");
@@ -424,20 +432,21 @@ async function runQualityMonitor({ force = false } = {}) {
       const linkResult = hasRealUrl(url)
         ? await fetchUrlStatus(url)
         : { ok: false, statusCode: 0, finalUrl: "", error: "missing_or_invalid_url" };
+      const linkIsUsable = linkResult.ok || isRestrictedButValidLink(event.source, linkResult.statusCode);
 
       upsertLinkCheck.run({
         event_id: event.id,
         checked_at: checkedAt,
         status_code: linkResult.statusCode,
-        ok: linkResult.ok ? 1 : 0,
+        ok: linkIsUsable ? 1 : 0,
         final_url: linkResult.finalUrl,
-        error: linkResult.error,
+        error: linkIsUsable && !linkResult.ok ? "restricted_by_origin" : linkResult.error,
       });
 
       const sourceId = String(event.source || "unknown");
       const prev = sourceStats.get(sourceId) || { count: 0, dead: 0, qualityTotal: 0 };
       prev.count += 1;
-      prev.dead += linkResult.ok ? 0 : 1;
+      prev.dead += linkIsUsable ? 0 : 1;
       prev.qualityTotal += qualityScoreLite(event);
       sourceStats.set(sourceId, prev);
     }

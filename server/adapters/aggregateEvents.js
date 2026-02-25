@@ -118,17 +118,30 @@ function dedupeEvents(events) {
   return Array.from(map.values());
 }
 
-function selectBalanced(events, { maxTotal = 380, perDayLimit = 44, perDayCityLimit = 5, perDayCategoryLimit = 10 } = {}) {
+function selectBalanced(
+  events,
+  {
+    maxTotal = 380,
+    perDayLimit = 44,
+    perDayCityLimit = 5,
+    perDayCategoryLimit = 10,
+    cityTotalLimit = Number.POSITIVE_INFINITY,
+    sourceCityTotalLimit = Number.POSITIVE_INFINITY,
+  } = {},
+) {
   const sorted = [...events].sort((a, b) => qualityScore(b) - qualityScore(a));
   const selected = [];
   const dayCounts = new Map();
   const dayCityCounts = new Map();
   const dayCategoryCounts = new Map();
+  const cityTotalCounts = new Map();
+  const sourceCityTotalCounts = new Map();
 
   for (const event of sorted) {
     if (selected.length >= maxTotal) break;
     const day = String(event.start_date || "");
     const city = normalizeCity(event.city);
+    const source = String(event.source || "unknown").toLowerCase();
     const categories = Array.isArray(event.category) && event.category.length ? event.category : ["community"];
 
     const dayCount = dayCounts.get(day) || 0;
@@ -137,6 +150,13 @@ function selectBalanced(events, { maxTotal = 380, perDayLimit = 44, perDayCityLi
     const dayCityKey = `${day}|${city}`;
     const cityCount = dayCityCounts.get(dayCityKey) || 0;
     if (cityCount >= perDayCityLimit) continue;
+
+    const cityTotal = cityTotalCounts.get(city) || 0;
+    if (cityTotal >= cityTotalLimit) continue;
+
+    const sourceCityKey = `${source}|${city}`;
+    const sourceCityTotal = sourceCityTotalCounts.get(sourceCityKey) || 0;
+    if (sourceCityTotal >= sourceCityTotalLimit) continue;
 
     let blockedByCategory = false;
     for (const category of categories) {
@@ -152,6 +172,8 @@ function selectBalanced(events, { maxTotal = 380, perDayLimit = 44, perDayCityLi
     selected.push(event);
     dayCounts.set(day, dayCount + 1);
     dayCityCounts.set(dayCityKey, cityCount + 1);
+    cityTotalCounts.set(city, cityTotal + 1);
+    sourceCityTotalCounts.set(sourceCityKey, sourceCityTotal + 1);
     for (const category of categories) {
       const dayCategoryKey = `${day}|${String(category || "community").toLowerCase()}`;
       dayCategoryCounts.set(dayCategoryKey, (dayCategoryCounts.get(dayCategoryKey) || 0) + 1);
@@ -275,11 +297,15 @@ export async function getCuratedEvents() {
     const livePerDayCityLimit = Number(process.env.LIVE_PER_DAY_CITY_LIMIT || 4);
     const livePerDayCategoryLimit = Number(process.env.LIVE_PER_DAY_CATEGORY_LIMIT || 14);
     const liveMaxTotal = Number(process.env.LIVE_MAX_TOTAL || 420);
+    const liveCityTotalLimit = Number(process.env.LIVE_CITY_TOTAL_LIMIT || 36);
+    const liveSourceCityTotalLimit = Number(process.env.LIVE_SOURCE_CITY_TOTAL_LIMIT || 24);
     const liveBalanced = selectBalanced(mergedReal, {
       maxTotal: Math.max(120, liveMaxTotal),
       perDayLimit: Math.max(12, livePerDayLimit),
       perDayCityLimit: Math.max(1, livePerDayCityLimit),
       perDayCategoryLimit: Math.max(4, livePerDayCategoryLimit),
+      cityTotalLimit: Math.max(8, liveCityTotalLimit),
+      sourceCityTotalLimit: Math.max(6, liveSourceCityTotalLimit),
     });
     return liveBalanced.sort((a, b) => {
       const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
