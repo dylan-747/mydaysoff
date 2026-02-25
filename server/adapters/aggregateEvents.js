@@ -271,11 +271,15 @@ export async function getCuratedEvents() {
   const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster, ...openActive]);
 
   if (liveOnly) {
+    const livePerDayLimit = Number(process.env.LIVE_PER_DAY_LIMIT || 64);
+    const livePerDayCityLimit = Number(process.env.LIVE_PER_DAY_CITY_LIMIT || 4);
+    const livePerDayCategoryLimit = Number(process.env.LIVE_PER_DAY_CATEGORY_LIMIT || 14);
+    const liveMaxTotal = Number(process.env.LIVE_MAX_TOTAL || 420);
     const liveBalanced = selectBalanced(mergedReal, {
-      maxTotal: 420,
-      perDayLimit: 64,
-      perDayCityLimit: 10,
-      perDayCategoryLimit: 14,
+      maxTotal: Math.max(120, liveMaxTotal),
+      perDayLimit: Math.max(12, livePerDayLimit),
+      perDayCityLimit: Math.max(1, livePerDayCityLimit),
+      perDayCategoryLimit: Math.max(4, livePerDayCategoryLimit),
     });
     return liveBalanced.sort((a, b) => {
       const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
