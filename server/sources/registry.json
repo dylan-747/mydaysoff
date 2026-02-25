@@ -22,5 +22,69 @@
     "url": "https://www.eventbrite.com/d/united-kingdom--london/events--this-weekend/rss/",
     "trust": "trusted-partner",
     "categoryHint": ["market", "music", "family"]
+  },
+  {
+    "id": "eventbrite-edinburgh",
+    "name": "Eventbrite Edinburgh",
+    "type": "rss",
+    "url": "https://www.eventbrite.com/d/united-kingdom--edinburgh/events--this-weekend/rss/",
+    "trust": "trusted-partner",
+    "categoryHint": ["family", "music", "wellbeing"]
+  },
+  {
+    "id": "eventbrite-glasgow",
+    "name": "Eventbrite Glasgow",
+    "type": "rss",
+    "url": "https://www.eventbrite.com/d/united-kingdom--glasgow/events--this-weekend/rss/",
+    "trust": "trusted-partner",
+    "categoryHint": ["music", "market", "family"]
+  },
+  {
+    "id": "eventbrite-scotland",
+    "name": "Eventbrite Scotland",
+    "type": "rss",
+    "url": "https://www.eventbrite.com/d/united-kingdom--scotland/events--this-weekend/rss/",
+    "trust": "trusted-partner",
+    "categoryHint": ["family", "wellbeing", "charity"]
+  },
+  {
+    "id": "whatson-edinburgh",
+    "name": "What's On Edinburgh",
+    "type": "rss",
+    "url": "https://www.whatsoninedinburgh.co.uk/rss.xml",
+    "trust": "trusted-partner",
+    "categoryHint": ["family", "market", "music"]
+  },
+  {
+    "id": "whatson-glasgow",
+    "name": "What's On Glasgow",
+    "type": "rss",
+    "url": "https://www.whatsonglasgow.co.uk/rss.xml",
+    "trust": "trusted-partner",
+    "categoryHint": ["music", "market", "family"]
+  },
+  {
+    "id": "edinburgh-festival-city",
+    "name": "Edinburgh Festival City",
+    "type": "rss",
+    "url": "https://www.edinburghfestivalcity.com/feed",
+    "trust": "official",
+    "categoryHint": ["music", "family", "charity"]
+  },
+  {
+    "id": "national-museums-scotland",
+    "name": "National Museums Scotland",
+    "type": "rss",
+    "url": "https://www.nms.ac.uk/feed",
+    "trust": "official",
+    "categoryHint": ["family", "wellbeing", "charity"]
+  },
+  {
+    "id": "glasgow-life-feed",
+    "name": "Glasgow Life",
+    "type": "rss",
+    "url": "https://www.glasgowlife.org.uk/feed",
+    "trust": "official",
+    "categoryHint": ["family", "wellbeing", "market"]
   }
 ]
