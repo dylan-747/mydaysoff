@@ -141,6 +141,27 @@ function extractJsonLikeLinksFromHtml(html, baseUrl) {
     }
     match = hrefRegex.exec(source);
   }
+
+  // Some OpenActive catalog pages embed feed URLs in JSON-LD/script text rather than href links.
+  const absoluteRegex = /https?:\/\/[^\s"'<>]+/gi;
+  let absolute = absoluteRegex.exec(source);
+  while (absolute) {
+    const candidate = absolute[0].replace(/[),.;]+$/, "");
+    const lower = candidate.toLowerCase();
+    if (lower.includes("openactive") || lower.includes(".json") || lower.includes("datacatalog")) {
+      const url = absoluteUrl(candidate, baseUrl);
+      if (url) links.add(url);
+    }
+    absolute = absoluteRegex.exec(source);
+  }
+
+  const relativeRegex = /["'](\/[^"']*(openactive|json|datacatalog)[^"']*)["']/gi;
+  let relative = relativeRegex.exec(source);
+  while (relative) {
+    const url = absoluteUrl(relative[1], baseUrl);
+    if (url) links.add(url);
+    relative = relativeRegex.exec(source);
+  }
   return Array.from(links);
 }
 
