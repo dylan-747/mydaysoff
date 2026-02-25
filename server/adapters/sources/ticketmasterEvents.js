@@ -1,4 +1,7 @@
 const TICKETMASTER_ENDPOINT = "https://app.ticketmaster.com/discovery/v2/events.json";
+const DEFAULT_DAYS_AHEAD = 30;
+const DEFAULT_MAX_PAGES = 6;
+const DEFAULT_PAGE_SIZE = 200;
 
 function pickCategory(classifications = []) {
   const segment = classifications[0]?.segment?.name?.toLowerCase() || "";
@@ -65,18 +68,37 @@ export async function getTicketmasterEvents() {
   const apiKey = process.env.TICKETMASTER_API_KEY;
   if (!apiKey) return [];
 
-  const url = new URL(TICKETMASTER_ENDPOINT);
-  url.searchParams.set("apikey", apiKey);
-  url.searchParams.set("countryCode", "GB");
-  url.searchParams.set("size", "120");
-  url.searchParams.set("sort", "date,asc");
+  const now = new Date();
+  const daysAhead = Number(process.env.TICKETMASTER_DAYS_AHEAD || DEFAULT_DAYS_AHEAD);
+  const maxPages = Number(process.env.TICKETMASTER_MAX_PAGES || DEFAULT_MAX_PAGES);
+  const pageSize = Number(process.env.TICKETMASTER_PAGE_SIZE || DEFAULT_PAGE_SIZE);
+  const end = new Date(now);
+  end.setDate(end.getDate() + Math.max(7, daysAhead));
+
+  const toTmIso = (value) => value.toISOString().replace(/\.\d{3}Z$/, "Z");
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) return [];
-    const data = await response.json();
-    const events = data?._embedded?.events || [];
-    return events.map(toEvent).filter(Boolean);
+    const all = [];
+    for (let page = 0; page < Math.max(1, maxPages); page += 1) {
+      const url = new URL(TICKETMASTER_ENDPOINT);
+      url.searchParams.set("apikey", apiKey);
+      url.searchParams.set("countryCode", "GB");
+      url.searchParams.set("sort", "date,asc");
+      url.searchParams.set("size", String(Math.max(20, Math.min(200, pageSize))));
+      url.searchParams.set("page", String(page));
+      url.searchParams.set("startDateTime", toTmIso(now));
+      url.searchParams.set("endDateTime", toTmIso(end));
+
+      const response = await fetch(url);
+      if (!response.ok) break;
+      const data = await response.json();
+      const pageEvents = (data?._embedded?.events || []).map(toEvent).filter(Boolean);
+      all.push(...pageEvents);
+
+      const totalPages = Number(data?.page?.totalPages || 0);
+      if (!pageEvents.length || (totalPages > 0 && page >= totalPages - 1)) break;
+    }
+    return all;
   } catch {
     return [];
   }

@@ -50,6 +50,7 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - Frontend auto-refreshes event feed every 60 seconds.
 - Admin import still exists for manual force-refresh, but is optional now.
 - If `TICKETMASTER_API_KEY` is set, Ticketmaster UK events are merged into the feed.
+- Ticketmaster fetch window can be tuned with `TICKETMASTER_DAYS_AHEAD`, `TICKETMASTER_MAX_PAGES`, and `TICKETMASTER_PAGE_SIZE`.
 - If `OPENACTIVE_FEEDS` is set (comma-separated JSON feed URLs), OpenActive activity listings are merged.
 - `server/sources/registry.json` controls trusted feed sources (NHS/council/partners).
 - `server/sources/openactive.json` can hold OpenActive source definitions (used when `OPENACTIVE_FEEDS` is empty).
