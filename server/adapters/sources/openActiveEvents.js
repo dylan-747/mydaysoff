@@ -5,6 +5,7 @@ const configPath = path.resolve(process.cwd(), "server/sources/openactive.json")
 const MAX_PAGES_PER_SOURCE = 3;
 const MAX_ITEMS_PER_SOURCE = 300;
 const MAX_FEEDS_PER_SOURCE = 8;
+const MAX_DISCOVERY_DEPTH = 3;
 
 function asArray(value) {
   if (!value) return [];
@@ -308,19 +309,35 @@ function normalizeRecord(source, record, index) {
 async function fetchSourceEvents(source) {
   const headers = { "User-Agent": "mydaysoff-openactive/1.0", Accept: "application/json" };
   const all = [];
+  const visited = new Set();
 
-  async function fetchFromFeedUrl(feedUrl, feedIndex) {
+  async function fetchFromFeedUrl(feedUrl, feedIndex, depth = 0) {
+    const firstUrl = absoluteUrl(feedUrl, source.url);
+    if (!firstUrl || visited.has(firstUrl) || all.length >= MAX_ITEMS_PER_SOURCE) return;
+    visited.add(firstUrl);
+
     let url = feedUrl;
-    for (let page = 0; page < MAX_PAGES_PER_SOURCE; page += 1) {
+    for (let page = 0; page < MAX_PAGES_PER_SOURCE && all.length < MAX_ITEMS_PER_SOURCE; page += 1) {
       if (!url || all.length >= MAX_ITEMS_PER_SOURCE) break;
       const response = await fetch(url, { headers });
       if (!response.ok) break;
       const payload = await response.json();
       const records = extractRecords(payload);
-      const normalized = records
-        .map((record, idx) => normalizeRecord(source, record, feedIndex * 10000 + page * 1000 + idx))
-        .filter(Boolean);
-      all.push(...normalized);
+      if (records.length) {
+        const normalized = records
+          .map((record, idx) => normalizeRecord(source, record, feedIndex * 10000 + page * 1000 + idx))
+          .filter(Boolean);
+        all.push(...normalized);
+      } else if (page === 0 && depth < MAX_DISCOVERY_DEPTH) {
+        // Some endpoints are catalogs that point to actual data feeds.
+        const discovered = extractDiscoveryUrls(payload, url);
+        let discoveredIndex = 0;
+        for (const discoveredUrl of discovered.slice(0, MAX_FEEDS_PER_SOURCE)) {
+          if (all.length >= MAX_ITEMS_PER_SOURCE) break;
+          await fetchFromFeedUrl(discoveredUrl, feedIndex + discoveredIndex + 1, depth + 1);
+          discoveredIndex += 1;
+        }
+      }
 
       const next = absoluteUrl(payload?.next, url);
       if (!next || next === url) break;
