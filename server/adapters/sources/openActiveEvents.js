@@ -127,6 +127,40 @@ function absoluteUrl(candidate, baseUrl) {
   }
 }
 
+function extractJsonLikeLinksFromHtml(html, baseUrl) {
+  const links = new Set();
+  const source = String(html || "");
+  const hrefRegex = /href\s*=\s*["']([^"']+)["']/gi;
+  let match = hrefRegex.exec(source);
+  while (match) {
+    const href = match[1];
+    const lower = href.toLowerCase();
+    if (lower.includes("json") || lower.includes("openactive")) {
+      const url = absoluteUrl(href, baseUrl);
+      if (url) links.add(url);
+    }
+    match = hrefRegex.exec(source);
+  }
+  return Array.from(links);
+}
+
+async function readOpenActiveResponse(response, requestUrl) {
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  const text = await response.text();
+  if (contentType.includes("json") || contentType.includes("ld+json")) {
+    try {
+      return { payload: JSON.parse(text), discovered: [] };
+    } catch {
+      return { payload: null, discovered: [] };
+    }
+  }
+  // Some providers return HTML catalog pages at /OpenActive/.
+  return {
+    payload: null,
+    discovered: extractJsonLikeLinksFromHtml(text, requestUrl),
+  };
+}
+
 function extractDiscoveryUrls(payload, baseUrl) {
   const urls = new Set();
   const add = (value) => {
@@ -321,7 +355,16 @@ async function fetchSourceEvents(source) {
       if (!url || all.length >= MAX_ITEMS_PER_SOURCE) break;
       const response = await fetch(url, { headers });
       if (!response.ok) break;
-      const payload = await response.json();
+      const { payload, discovered } = await readOpenActiveResponse(response, url);
+      if (!payload && discovered.length && depth < MAX_DISCOVERY_DEPTH) {
+        let discoveredIndex = 0;
+        for (const discoveredUrl of discovered.slice(0, MAX_FEEDS_PER_SOURCE)) {
+          if (all.length >= MAX_ITEMS_PER_SOURCE) break;
+          await fetchFromFeedUrl(discoveredUrl, feedIndex + discoveredIndex + 1, depth + 1);
+          discoveredIndex += 1;
+        }
+        break;
+      }
       const records = extractRecords(payload);
       if (records.length) {
         const normalized = records
@@ -347,7 +390,18 @@ async function fetchSourceEvents(source) {
 
   const entryResponse = await fetch(source.url, { headers });
   if (!entryResponse.ok) return [];
-  const entryPayload = await entryResponse.json();
+  const entryRead = await readOpenActiveResponse(entryResponse, source.url);
+  const entryPayload = entryRead.payload;
+  if (!entryPayload && entryRead.discovered.length) {
+    let discoveredIndex = 0;
+    for (const discoveredUrl of entryRead.discovered.slice(0, MAX_FEEDS_PER_SOURCE)) {
+      if (all.length >= MAX_ITEMS_PER_SOURCE) break;
+      await fetchFromFeedUrl(discoveredUrl, discoveredIndex + 1, 1);
+      discoveredIndex += 1;
+    }
+    return all.slice(0, MAX_ITEMS_PER_SOURCE);
+  }
+  if (!entryPayload) return [];
 
   const directRecords = extractRecords(entryPayload);
   if (directRecords.length) {
