@@ -256,7 +256,7 @@ export default function App() {
   }, [events, selectedDate, category, cost, heat]);
 
   const visibleEvents = useMemo(() => dayFiltered.filter((event) => inBounds(event, mapBounds)), [dayFiltered, mapBounds]);
-  const listEvents = visibleEvents.length > 0 ? visibleEvents : dayFiltered;
+  const listEvents = visibleEvents;
   const navigationEvents = useMemo(() => {
     return [...dayFiltered]
       .filter((event) => hasCoords(event))
@@ -634,7 +634,7 @@ export default function App() {
           <div className="space-y-2">
             {visibleEvents.length === 0 && dayFiltered.length > 0 && (
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                Map view is very tight; showing all events for this day.
+                No events in this map area for the selected day. Pan or zoom out.
               </div>
             )}
             {listEvents.length === 0 ? (
