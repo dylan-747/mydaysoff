@@ -4,6 +4,7 @@ import path from "node:path";
 const configPath = path.resolve(process.cwd(), "server/sources/openactive.json");
 const MAX_PAGES_PER_SOURCE = 3;
 const MAX_ITEMS_PER_SOURCE = 300;
+const MAX_FEEDS_PER_SOURCE = 8;
 
 function asArray(value) {
   if (!value) return [];
@@ -104,6 +105,8 @@ function roughCoords(city) {
 function extractRecords(payload) {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
+  const typeValue = clean(payload?.["@type"] || payload?.type || "").toLowerCase();
+  if (typeValue.includes("datacatalog")) return [];
   if (Array.isArray(payload?.items)) {
     return payload.items.map((item) => item?.data || item).filter(Boolean);
   }
@@ -111,6 +114,63 @@ function extractRecords(payload) {
   if (Array.isArray(payload?.["@graph"])) return payload["@graph"];
   if (payload?.id || payload?.identifier || payload?.name) return [payload];
   return [];
+}
+
+function absoluteUrl(candidate, baseUrl) {
+  const value = clean(candidate);
+  if (!value) return "";
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
+function extractDiscoveryUrls(payload, baseUrl) {
+  const urls = new Set();
+  const add = (value) => {
+    const url = absoluteUrl(value, baseUrl);
+    if (url) urls.add(url);
+  };
+
+  if (!payload) return [];
+
+  for (const item of asArray(payload?.dataset)) {
+    if (typeof item === "string") add(item);
+    else if (typeof item === "object") {
+      add(item?.url);
+      add(item?.contentUrl);
+      add(item?.id);
+      for (const dist of asArray(item?.distribution)) {
+        if (typeof dist === "string") add(dist);
+        else {
+          add(dist?.contentUrl);
+          add(dist?.url);
+          add(dist?.id);
+        }
+      }
+    }
+  }
+
+  for (const item of asArray(payload?.hasPart)) {
+    if (typeof item === "string") add(item);
+    else if (typeof item === "object") {
+      add(item?.url);
+      add(item?.id);
+      add(item?.contentUrl);
+    }
+  }
+
+  for (const dist of asArray(payload?.distribution)) {
+    if (typeof dist === "string") add(dist);
+    else {
+      add(dist?.contentUrl);
+      add(dist?.url);
+      add(dist?.id);
+    }
+  }
+
+  return Array.from(urls);
 }
 
 function categoryFromText(source, text) {
@@ -246,20 +306,52 @@ function normalizeRecord(source, record, index) {
 }
 
 async function fetchSourceEvents(source) {
-  let url = source.url;
+  const headers = { "User-Agent": "mydaysoff-openactive/1.0", Accept: "application/json" };
   const all = [];
-  for (let page = 0; page < MAX_PAGES_PER_SOURCE; page += 1) {
-    if (!url || all.length >= MAX_ITEMS_PER_SOURCE) break;
-    const response = await fetch(url, { headers: { "User-Agent": "mydaysoff-openactive/1.0", Accept: "application/json" } });
-    if (!response.ok) break;
-    const payload = await response.json();
-    const records = extractRecords(payload);
-    const normalized = records.map((record, idx) => normalizeRecord(source, record, page * 1000 + idx)).filter(Boolean);
-    all.push(...normalized);
-    const next = clean(payload?.next || "");
-    if (!next || next === url) break;
-    url = next;
+
+  async function fetchFromFeedUrl(feedUrl, feedIndex) {
+    let url = feedUrl;
+    for (let page = 0; page < MAX_PAGES_PER_SOURCE; page += 1) {
+      if (!url || all.length >= MAX_ITEMS_PER_SOURCE) break;
+      const response = await fetch(url, { headers });
+      if (!response.ok) break;
+      const payload = await response.json();
+      const records = extractRecords(payload);
+      const normalized = records
+        .map((record, idx) => normalizeRecord(source, record, feedIndex * 10000 + page * 1000 + idx))
+        .filter(Boolean);
+      all.push(...normalized);
+
+      const next = absoluteUrl(payload?.next, url);
+      if (!next || next === url) break;
+      url = next;
+    }
   }
+
+  const entryResponse = await fetch(source.url, { headers });
+  if (!entryResponse.ok) return [];
+  const entryPayload = await entryResponse.json();
+
+  const directRecords = extractRecords(entryPayload);
+  if (directRecords.length) {
+    const normalized = directRecords.map((record, idx) => normalizeRecord(source, record, idx)).filter(Boolean);
+    all.push(...normalized);
+  }
+
+  const discovered = extractDiscoveryUrls(entryPayload, source.url);
+  if (!directRecords.length && !discovered.length) {
+    // Some providers expose feed pages directly at source.url with a next chain.
+    await fetchFromFeedUrl(source.url, 0);
+    return all.slice(0, MAX_ITEMS_PER_SOURCE);
+  }
+
+  let feedIndex = 0;
+  for (const feedUrl of discovered.slice(0, MAX_FEEDS_PER_SOURCE)) {
+    if (all.length >= MAX_ITEMS_PER_SOURCE) break;
+    await fetchFromFeedUrl(feedUrl, feedIndex);
+    feedIndex += 1;
+  }
+
   return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
