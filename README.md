@@ -64,6 +64,7 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - `POST /api/events/submissions` (creates pending event)
 - `POST /api/events/:id/vote` (fire/upvote)
 - `GET /api/admin/submissions` (admin)
+- `GET /api/admin/stats` (admin volume/date/source breakdown)
 - `PATCH /api/admin/events/:id/status` (admin approve/reject)
 - `POST /api/admin/ingest` (admin import curated source events)
 - `GET /api/admin/quality` (admin source health, dead links, category coverage)

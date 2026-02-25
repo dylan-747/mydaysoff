@@ -729,6 +729,86 @@ app.get("/api/admin/quality", requireAdmin, (_req, res) => {
   });
 });
 
+app.get("/api/admin/stats", requireAdmin, (_req, res) => {
+  const totals = db
+    .prepare(
+      `
+      SELECT
+        COUNT(*) AS approved_total,
+        SUM(CASE WHEN source = 'user' THEN 1 ELSE 0 END) AS approved_user,
+        SUM(CASE WHEN source != 'user' THEN 1 ELSE 0 END) AS approved_ingested
+      FROM events
+      WHERE status = 'approved'
+      `,
+    )
+    .get();
+
+  const next14Days = db
+    .prepare(
+      `
+      SELECT start_date, COUNT(*) AS count
+      FROM events
+      WHERE status = 'approved'
+        AND start_date >= date('now')
+        AND start_date <= date('now', '+13 day')
+      GROUP BY start_date
+      ORDER BY start_date ASC
+      `,
+    )
+    .all();
+
+  const bySource = db
+    .prepare(
+      `
+      SELECT source, source_trust, COUNT(*) AS count
+      FROM events
+      WHERE status = 'approved'
+      GROUP BY source, source_trust
+      ORDER BY count DESC
+      `,
+    )
+    .all();
+
+  const byVerification = db
+    .prepare(
+      `
+      SELECT verification_status, COUNT(*) AS count
+      FROM events
+      WHERE status = 'approved'
+      GROUP BY verification_status
+      ORDER BY count DESC
+      `,
+    )
+    .all();
+
+  const byCity = db
+    .prepare(
+      `
+      SELECT city, COUNT(*) AS count
+      FROM events
+      WHERE status = 'approved'
+      GROUP BY city
+      ORDER BY count DESC
+      LIMIT 30
+      `,
+    )
+    .all();
+
+  return res.json({
+    ok: true,
+    generated_at: new Date().toISOString(),
+    totals: {
+      approved_total: Number(totals?.approved_total || 0),
+      approved_user: Number(totals?.approved_user || 0),
+      approved_ingested: Number(totals?.approved_ingested || 0),
+    },
+    next_14_days: next14Days.map((row) => ({ date: row.start_date, count: Number(row.count || 0) })),
+    by_source: bySource.map((row) => ({ source: row.source, source_trust: row.source_trust, count: Number(row.count || 0) })),
+    by_verification: byVerification.map((row) => ({ verification_status: row.verification_status, count: Number(row.count || 0) })),
+    by_city: byCity.map((row) => ({ city: row.city, count: Number(row.count || 0) })),
+  });
+});
+
 app.post("/api/geocode/what3words", async (req, res) => {
   const apiKey = process.env.WHAT3WORDS_API_KEY;
   const words = String(req.body?.words || "").trim().replace(/^\/+/, "");
