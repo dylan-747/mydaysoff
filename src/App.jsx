@@ -219,6 +219,7 @@ export default function App() {
   const [newsletterOpen, setNewsletterOpen] = useState(false);
   const [newsletterStatus, setNewsletterStatus] = useState("");
   const [newsletterBusy, setNewsletterBusy] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [newsletterForm, setNewsletterForm] = useState({
     email: "",
     city: "",
@@ -237,6 +238,7 @@ export default function App() {
       const data = await getEvents();
       const nextEvents = data.events || [];
       setEvents(nextEvents);
+      setLastUpdatedAt(Date.now());
       try {
         localStorage.setItem(
           EVENTS_CACHE_KEY,
@@ -262,6 +264,9 @@ export default function App() {
         const cached = JSON.parse(cachedRaw);
         if (Array.isArray(cached?.events) && cached.events.length) {
           setEvents(cached.events);
+          if (Number.isFinite(Number(cached?.saved_at))) {
+            setLastUpdatedAt(Number(cached.saved_at));
+          }
         }
       }
     } catch {
@@ -518,6 +523,9 @@ export default function App() {
           <div className="text-xs text-slate-500">
             Map-first mode: pan or zoom to any city and the sidebar follows. Feed auto-refreshes every minute.
           </div>
+          {lastUpdatedAt && (
+            <div className="text-[11px] text-slate-400">Last updated {new Date(lastUpdatedAt).toLocaleTimeString()}</div>
+          )}
         </div>
       </header>
 
