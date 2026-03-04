@@ -193,6 +193,16 @@ function verificationLabel(status) {
   return "Unverified";
 }
 
+function apiErrorBannerText() {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (host === "mydaysoff.co.uk" || host === "www.mydaysoff.co.uk") {
+      return "Live API unavailable right now. Showing sample events only (unverified).";
+    }
+  }
+  return "Live API unavailable right now. Showing sample events only (unverified). Run npm run dev:all for live data.";
+}
+
 export default function App() {
   const today = useMemo(() => new Date(), []);
   const [rangeDays] = useState(14);
@@ -241,7 +251,7 @@ export default function App() {
       setError("");
     } catch (err) {
       if (!events.length) setEvents(fallbackEvents);
-      setError("Live API unavailable right now. Showing sample events only (unverified). Run npm run dev:all for live data.");
+      setError(apiErrorBannerText());
     }
   }
 

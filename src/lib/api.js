@@ -1,4 +1,18 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+function resolveApiBase() {
+  const configured = import.meta.env.VITE_API_BASE_URL;
+  if (configured) return configured;
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (host === "mydaysoff.co.uk" || host === "www.mydaysoff.co.uk") {
+      return "https://mydaysoff.onrender.com";
+    }
+  }
+
+  return "http://localhost:8787";
+}
+
+const API_BASE = resolveApiBase();
 
 async function request(path, options = {}) {
   const mergedHeaders = {
