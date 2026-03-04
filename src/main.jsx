@@ -6,19 +6,23 @@ import About from './pages/About.jsx'
 import Submit from './pages/Submit.jsx'
 import Admin from './pages/Admin.jsx'
 import Privacy from './pages/Privacy.jsx'
+import BuildStamp from './components/BuildStamp.jsx'
 import './index.css'
 import 'leaflet/dist/leaflet.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/submit" element={<Submit />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/privacy" element={<Privacy />} />
-      </Routes>
+      <>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/submit" element={<Submit />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/privacy" element={<Privacy />} />
+        </Routes>
+        <BuildStamp />
+      </>
     </HashRouter>
   </React.StrictMode>,
 )
