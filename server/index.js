@@ -14,9 +14,11 @@ const stripeTrialDays = Number(process.env.STRIPE_TRIAL_DAYS || 30);
 const linkCheckIntervalMs = Number(process.env.LINK_CHECK_INTERVAL_MS || 3 * 60 * 60 * 1000);
 const linkCheckMaxPerRun = Number(process.env.LINK_CHECK_MAX_PER_RUN || 40);
 const linkCheckStaleHours = Number(process.env.LINK_CHECK_STALE_HOURS || 24);
+const eventsCacheTtlMs = Number(process.env.EVENTS_CACHE_TTL_MS || 30000);
 
 let lastLinkCheckAt = 0;
 let qualityMonitorRunning = false;
+let eventsResponseCache = { builtAt: 0, payload: null };
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -340,6 +342,7 @@ async function ingestCuratedEvents() {
       });
       tx();
     }
+    eventsResponseCache = { builtAt: 0, payload: null };
     return 0;
   }
 
@@ -353,6 +356,7 @@ async function ingestCuratedEvents() {
     }
   });
   tx(incoming);
+  eventsResponseCache = { builtAt: 0, payload: null };
   queueQualityMonitor();
   return incoming.length;
 }
@@ -477,6 +481,12 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/api/events", (_req, res) => {
+  const now = Date.now();
+  if (eventsResponseCache.payload && now - eventsResponseCache.builtAt <= eventsCacheTtlMs) {
+    res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=120");
+    return res.json(eventsResponseCache.payload);
+  }
+
   const rows = db
     .prepare(
       `
@@ -489,7 +499,10 @@ app.get("/api/events", (_req, res) => {
     )
     .all();
 
-  res.json({ events: rows.map(formatEvent) });
+  const payload = { events: rows.map(formatEvent) };
+  eventsResponseCache = { builtAt: now, payload };
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=120");
+  return res.json(payload);
 });
 
 app.post("/api/events/submissions", (req, res) => {

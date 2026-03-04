@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import MapView from "./MapView.jsx";
 import { getEvents, signupNewsletter, voteEvent } from "./lib/api.js";
+const EVENTS_CACHE_KEY = "mydaysoff_events_cache_v1";
 const todayYmd = new Date().toISOString().slice(0, 10);
 const fallbackEvents = [
   {
@@ -224,15 +225,38 @@ export default function App() {
   async function loadEvents() {
     try {
       const data = await getEvents();
-      setEvents(data.events || []);
+      const nextEvents = data.events || [];
+      setEvents(nextEvents);
+      try {
+        localStorage.setItem(
+          EVENTS_CACHE_KEY,
+          JSON.stringify({
+            saved_at: Date.now(),
+            events: nextEvents,
+          }),
+        );
+      } catch {
+        // Ignore cache write failures (private mode/full storage).
+      }
       setError("");
     } catch (err) {
-      setEvents(fallbackEvents);
+      if (!events.length) setEvents(fallbackEvents);
       setError("Live API unavailable right now. Showing sample events only (unverified). Run npm run dev:all for live data.");
     }
   }
 
   useEffect(() => {
+    try {
+      const cachedRaw = localStorage.getItem(EVENTS_CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (Array.isArray(cached?.events) && cached.events.length) {
+          setEvents(cached.events);
+        }
+      }
+    } catch {
+      // Ignore cache read failures.
+    }
     loadEvents();
   }, []);
 
