@@ -45,6 +45,12 @@ function daysUntil(dateStr) {
   return Math.round((day.valueOf() - today.valueOf()) / (24 * 60 * 60 * 1000));
 }
 
+function dayTierDelta(dateStr) {
+  const delta = daysUntil(dateStr);
+  if (!Number.isFinite(delta)) return 365;
+  return Math.max(0, delta);
+}
+
 function trustScore(event) {
   const trust = String(event?.source_trust || "");
   if (trust === "official") return 40;
@@ -123,8 +129,15 @@ function selectBalanced(
   {
     maxTotal = 380,
     perDayLimit = 44,
+    perDayLimitNear = perDayLimit,
+    perDayLimitFar = perDayLimit,
+    nearDays = 3,
     perDayCityLimit = 5,
+    perDayCityLimitNear = perDayCityLimit,
+    perDayCityLimitFar = perDayCityLimit,
     perDayCategoryLimit = 10,
+    perDayCategoryLimitNear = perDayCategoryLimit,
+    perDayCategoryLimitFar = perDayCategoryLimit,
     cityTotalLimit = Number.POSITIVE_INFINITY,
     sourceCityTotalLimit = Number.POSITIVE_INFINITY,
   } = {},
@@ -140,16 +153,21 @@ function selectBalanced(
   for (const event of sorted) {
     if (selected.length >= maxTotal) break;
     const day = String(event.start_date || "");
+    const delta = dayTierDelta(event.start_date);
+    const isNear = delta <= nearDays;
+    const activePerDayLimit = isNear ? perDayLimitNear : perDayLimitFar;
+    const activePerDayCityLimit = isNear ? perDayCityLimitNear : perDayCityLimitFar;
+    const activePerDayCategoryLimit = isNear ? perDayCategoryLimitNear : perDayCategoryLimitFar;
     const city = normalizeCity(event.city);
     const source = String(event.source || "unknown").toLowerCase();
     const categories = Array.isArray(event.category) && event.category.length ? event.category : ["community"];
 
     const dayCount = dayCounts.get(day) || 0;
-    if (dayCount >= perDayLimit) continue;
+    if (dayCount >= activePerDayLimit) continue;
 
     const dayCityKey = `${day}|${city}`;
     const cityCount = dayCityCounts.get(dayCityKey) || 0;
-    if (cityCount >= perDayCityLimit) continue;
+    if (cityCount >= activePerDayCityLimit) continue;
 
     const cityTotal = cityTotalCounts.get(city) || 0;
     if (cityTotal >= cityTotalLimit) continue;
@@ -162,7 +180,7 @@ function selectBalanced(
     for (const category of categories) {
       const dayCategoryKey = `${day}|${String(category || "community").toLowerCase()}`;
       const categoryCount = dayCategoryCounts.get(dayCategoryKey) || 0;
-      if (categoryCount >= perDayCategoryLimit) {
+      if (categoryCount >= activePerDayCategoryLimit) {
         blockedByCategory = true;
         break;
       }
@@ -293,17 +311,30 @@ export async function getCuratedEvents() {
   const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster, ...openActive]);
 
   if (liveOnly) {
-    const livePerDayLimit = Number(process.env.LIVE_PER_DAY_LIMIT || 64);
-    const livePerDayCityLimit = Number(process.env.LIVE_PER_DAY_CITY_LIMIT || 4);
-    const livePerDayCategoryLimit = Number(process.env.LIVE_PER_DAY_CATEGORY_LIMIT || 14);
+    const liveNearDays = Number(process.env.LIVE_NEAR_DAYS || 3);
+    const livePerDayLimit = Number(process.env.LIVE_PER_DAY_LIMIT || 120);
+    const livePerDayCityLimit = Number(process.env.LIVE_PER_DAY_CITY_LIMIT || 10);
+    const livePerDayCategoryLimit = Number(process.env.LIVE_PER_DAY_CATEGORY_LIMIT || 24);
+    const livePerDayNearLimit = Number(process.env.LIVE_PER_DAY_NEAR_LIMIT || livePerDayLimit);
+    const livePerDayFarLimit = Number(process.env.LIVE_PER_DAY_FAR_LIMIT || Math.round(livePerDayLimit * 1.5));
+    const livePerDayCityNearLimit = Number(process.env.LIVE_PER_DAY_CITY_NEAR_LIMIT || livePerDayCityLimit);
+    const livePerDayCityFarLimit = Number(process.env.LIVE_PER_DAY_CITY_FAR_LIMIT || Math.round(livePerDayCityLimit * 1.6));
+    const livePerDayCategoryNearLimit = Number(process.env.LIVE_PER_DAY_CATEGORY_NEAR_LIMIT || livePerDayCategoryLimit);
+    const livePerDayCategoryFarLimit = Number(
+      process.env.LIVE_PER_DAY_CATEGORY_FAR_LIMIT || Math.round(livePerDayCategoryLimit * 1.5),
+    );
     const liveMaxTotal = Number(process.env.LIVE_MAX_TOTAL || 420);
     const liveCityTotalLimit = Number(process.env.LIVE_CITY_TOTAL_LIMIT || 36);
     const liveSourceCityTotalLimit = Number(process.env.LIVE_SOURCE_CITY_TOTAL_LIMIT || 24);
     const liveBalanced = selectBalanced(mergedReal, {
       maxTotal: Math.max(120, liveMaxTotal),
-      perDayLimit: Math.max(12, livePerDayLimit),
-      perDayCityLimit: Math.max(1, livePerDayCityLimit),
-      perDayCategoryLimit: Math.max(4, livePerDayCategoryLimit),
+      nearDays: Math.max(1, liveNearDays),
+      perDayLimitNear: Math.max(12, livePerDayNearLimit),
+      perDayLimitFar: Math.max(12, livePerDayFarLimit),
+      perDayCityLimitNear: Math.max(1, livePerDayCityNearLimit),
+      perDayCityLimitFar: Math.max(1, livePerDayCityFarLimit),
+      perDayCategoryLimitNear: Math.max(4, livePerDayCategoryNearLimit),
+      perDayCategoryLimitFar: Math.max(4, livePerDayCategoryFarLimit),
       cityTotalLimit: Math.max(8, liveCityTotalLimit),
       sourceCityTotalLimit: Math.max(6, liveSourceCityTotalLimit),
     });
