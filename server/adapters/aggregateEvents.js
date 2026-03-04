@@ -235,6 +235,63 @@ function ensureWeeklyMinimum(selected, pool, { minWeekly = DEFAULT_MIN_WEEKLY_EV
   return next;
 }
 
+function ensureFutureDayMinimum(
+  selected,
+  pool,
+  { dayMin = 16, windowDays = 35, maxTotal = Number.POSITIVE_INFINITY } = {},
+) {
+  if (dayMin <= 0 || windowDays <= 0) return selected;
+  const next = [...selected];
+  const selectedIds = new Set(next.map((event) => event.id));
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const dayKey = (d) => d.toISOString().slice(0, 10);
+  const inWindow = new Set(Array.from({ length: windowDays + 1 }, (_, i) => {
+    const day = new Date(start);
+    day.setDate(day.getDate() + i);
+    return dayKey(day);
+  }));
+
+  const selectedByDay = new Map();
+  for (const event of next) {
+    const day = String(event.start_date || "");
+    if (!inWindow.has(day)) continue;
+    selectedByDay.set(day, (selectedByDay.get(day) || 0) + 1);
+  }
+
+  const poolByDay = new Map();
+  for (const event of pool) {
+    const day = String(event.start_date || "");
+    if (!inWindow.has(day) || selectedIds.has(event.id)) continue;
+    if (!poolByDay.has(day)) poolByDay.set(day, []);
+    poolByDay.get(day).push(event);
+  }
+
+  for (const events of poolByDay.values()) {
+    events.sort((a, b) => qualityScore(b) - qualityScore(a));
+  }
+
+  for (const day of inWindow) {
+    if (next.length >= maxTotal) break;
+    const current = selectedByDay.get(day) || 0;
+    if (current >= dayMin) continue;
+    const candidates = poolByDay.get(day) || [];
+    if (!candidates.length) continue;
+    const needed = dayMin - current;
+    let added = 0;
+    for (const candidate of candidates) {
+      if (added >= needed || next.length >= maxTotal) break;
+      if (selectedIds.has(candidate.id)) continue;
+      next.push(candidate);
+      selectedIds.add(candidate.id);
+      added += 1;
+    }
+    if (added > 0) selectedByDay.set(day, current + added);
+  }
+
+  return next;
+}
+
 function ensureCategoryCoverage(
   selected,
   pool,
@@ -324,6 +381,8 @@ export async function getCuratedEvents() {
       process.env.LIVE_PER_DAY_CATEGORY_FAR_LIMIT || Math.round(livePerDayCategoryLimit * 1.5),
     );
     const liveMaxTotal = Number(process.env.LIVE_MAX_TOTAL || 420);
+    const liveFutureWindowDays = Number(process.env.LIVE_FUTURE_WINDOW_DAYS || 35);
+    const liveFutureDayMin = Number(process.env.LIVE_FUTURE_DAY_MIN || 16);
     const liveCityTotalLimit = Number(process.env.LIVE_CITY_TOTAL_LIMIT || 36);
     const liveSourceCityTotalLimit = Number(process.env.LIVE_SOURCE_CITY_TOTAL_LIMIT || 24);
     const liveBalanced = selectBalanced(mergedReal, {
@@ -338,7 +397,12 @@ export async function getCuratedEvents() {
       cityTotalLimit: Math.max(8, liveCityTotalLimit),
       sourceCityTotalLimit: Math.max(6, liveSourceCityTotalLimit),
     });
-    return liveBalanced.sort((a, b) => {
+    const liveFutureBoosted = ensureFutureDayMinimum(liveBalanced, mergedReal, {
+      dayMin: Math.max(0, liveFutureDayMin),
+      windowDays: Math.max(7, liveFutureWindowDays),
+      maxTotal: Math.max(120, liveMaxTotal),
+    });
+    return liveFutureBoosted.sort((a, b) => {
       const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
       if (dateCmp !== 0) return dateCmp;
       return qualityScore(b) - qualityScore(a);

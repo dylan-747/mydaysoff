@@ -57,7 +57,7 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 - Each event stores proof fields (source listing URL, feed URL, verification status, last seen).
 - Ingest now enforces per-day city caps and category coverage targets for filter diversity.
 - Link health checks run in background (`LINK_CHECK_INTERVAL_MS`) and track dead-link rates by source.
-- Live-source mode caps can be tuned with `LIVE_MAX_TOTAL`, `LIVE_NEAR_DAYS`, `LIVE_PER_DAY_NEAR_LIMIT`, `LIVE_PER_DAY_FAR_LIMIT`, `LIVE_PER_DAY_CITY_NEAR_LIMIT`, `LIVE_PER_DAY_CITY_FAR_LIMIT`, `LIVE_PER_DAY_CATEGORY_NEAR_LIMIT`, `LIVE_PER_DAY_CATEGORY_FAR_LIMIT`, `LIVE_CITY_TOTAL_LIMIT`, `LIVE_SOURCE_CITY_TOTAL_LIMIT`.
+- Live-source mode caps can be tuned with `LIVE_MAX_TOTAL`, `LIVE_NEAR_DAYS`, `LIVE_PER_DAY_NEAR_LIMIT`, `LIVE_PER_DAY_FAR_LIMIT`, `LIVE_PER_DAY_CITY_NEAR_LIMIT`, `LIVE_PER_DAY_CITY_FAR_LIMIT`, `LIVE_PER_DAY_CATEGORY_NEAR_LIMIT`, `LIVE_PER_DAY_CATEGORY_FAR_LIMIT`, `LIVE_FUTURE_WINDOW_DAYS`, `LIVE_FUTURE_DAY_MIN`, `LIVE_CITY_TOTAL_LIMIT`, `LIVE_SOURCE_CITY_TOTAL_LIMIT`.
 
 ## API Endpoints
 
