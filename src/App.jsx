@@ -142,6 +142,17 @@ function ymd(d) {
   return d.toISOString().slice(0, 10);
 }
 
+function dayOffsetFromToday(dateStr) {
+  const raw = String(dateStr || "");
+  if (!raw) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(raw);
+  date.setHours(0, 0, 0, 0);
+  if (Number.isNaN(date.valueOf())) return null;
+  return Math.round((date.valueOf() - today.valueOf()) / (24 * 60 * 60 * 1000));
+}
+
 function within(d, s, e) {
   const x = new Date(ymd(d));
   const S = new Date(s);
@@ -205,7 +216,6 @@ function apiErrorBannerText() {
 
 export default function App() {
   const today = useMemo(() => new Date(), []);
-  const [rangeDays] = useState(14);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [category, setCategory] = useState("");
   const [cost, setCost] = useState("");
@@ -226,10 +236,27 @@ export default function App() {
     interests: [],
   });
 
+  const rangeDays = useMemo(() => {
+    const configured = Number(import.meta.env.VITE_CALENDAR_DAYS || 90);
+    const maxDays = Number.isFinite(configured) ? Math.min(180, Math.max(14, configured)) : 90;
+    let furthestEventOffset = 14;
+    for (const event of events) {
+      const startOffset = dayOffsetFromToday(event?.start_date);
+      const endOffset = dayOffsetFromToday(event?.end_date);
+      if (Number.isFinite(startOffset)) furthestEventOffset = Math.max(furthestEventOffset, startOffset);
+      if (Number.isFinite(endOffset)) furthestEventOffset = Math.max(furthestEventOffset, endOffset);
+    }
+    return Math.min(maxDays, Math.max(14, furthestEventOffset));
+  }, [events]);
+
   const days = useMemo(
     () => Array.from({ length: rangeDays + 1 }, (_, i) => addDays(today, i)),
     [today, rangeDays],
   );
+
+  useEffect(() => {
+    setSelectedIndex((prev) => Math.min(prev, rangeDays));
+  }, [rangeDays]);
 
   const selectedDate = days[selectedIndex];
 
