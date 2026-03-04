@@ -77,7 +77,7 @@ export default function Submit() {
     }
 
     try {
-      await submitEvent({
+      const response = await submitEvent({
         name: form.name.trim(),
         summary: form.summary.trim(),
         start_date: form.start_date,
@@ -103,7 +103,11 @@ export default function Submit() {
         },
       });
 
-      setStatus("Thanks. Your event is submitted for review and will go live once approved.");
+      if (response?.status === "approved") {
+        setStatus("Thanks. Your event is live now and marked user submitted.");
+      } else {
+        setStatus("Thanks. Your event is submitted for review and will go live once approved.");
+      }
       setForm({
         name: "",
         summary: "",

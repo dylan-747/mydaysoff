@@ -2,7 +2,7 @@
 
 Community-led events map for "what's hottest today" with:
 - upvote-only fire ranking
-- user event submissions (moderated)
+- user event submissions (auto-approved by default)
 - admin approval/rejection workflow
 - automatic ingestion from curated trusted-source adapters
 - automated feed registry ingestion (RSS/Atom/ICS) with proof metadata
@@ -62,7 +62,7 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 ## API Endpoints
 
 - `GET /api/events` (approved events)
-- `POST /api/events/submissions` (creates pending event)
+- `POST /api/events/submissions` (creates approved event by default)
 - `POST /api/events/:id/vote` (fire/upvote)
 - `GET /api/admin/submissions` (admin)
 - `GET /api/admin/stats` (admin volume/date/source breakdown)
@@ -75,6 +75,7 @@ Default token is `dev-admin-token` unless `ADMIN_TOKEN` is set in `.env`.
 ## Notes
 
 - Votes are fire-only and cumulative.
-- Submissions stay hidden until approved.
+- Submissions are auto-approved by default (`AUTO_APPROVE_SUBMISSIONS=true`).
+- Set `AUTO_APPROVE_SUBMISSIONS=false` to require admin moderation again.
 - what3words and Stripe are env-key gated and ready to wire.
 - Stripe checkout creates a subscription with `STRIPE_TRIAL_DAYS` free (default `30`), then bills your `STRIPE_PRICE_ID`.

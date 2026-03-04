@@ -15,6 +15,7 @@ const linkCheckIntervalMs = Number(process.env.LINK_CHECK_INTERVAL_MS || 3 * 60 
 const linkCheckMaxPerRun = Number(process.env.LINK_CHECK_MAX_PER_RUN || 40);
 const linkCheckStaleHours = Number(process.env.LINK_CHECK_STALE_HOURS || 24);
 const eventsCacheTtlMs = Number(process.env.EVENTS_CACHE_TTL_MS || 30000);
+const autoApproveSubmissions = process.env.AUTO_APPROVE_SUBMISSIONS !== "false";
 
 let lastLinkCheckAt = 0;
 let qualityMonitorRunning = false;
@@ -514,7 +515,7 @@ app.post("/api/events/submissions", (req, res) => {
   const event = toEventRow({
     ...payload,
     id: `user_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
-    status: "pending",
+    status: autoApproveSubmissions ? "approved" : "pending",
     source: "user",
     source_trust: "community",
     verification_status: "community-submitted",
@@ -531,7 +532,8 @@ app.post("/api/events/submissions", (req, res) => {
 
   insertEvent.run(event);
   ensureVoteRow.run(event.id);
-  return res.status(201).json({ ok: true, id: event.id, status: "pending" });
+  eventsResponseCache = { builtAt: 0, payload: null };
+  return res.status(201).json({ ok: true, id: event.id, status: event.status });
 });
 
 app.post("/api/events/:id/vote", (req, res) => {

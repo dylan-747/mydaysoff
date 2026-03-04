@@ -189,7 +189,7 @@ function formatAudience(audience) {
 
 function verificationLabel(status) {
   if (status === "feed-listing" || status === "ticketmaster-listing") return "Verified listing";
-  if (status === "community-submitted") return "Community listing";
+  if (status === "community-submitted") return "User submitted";
   return "Unverified";
 }
 
