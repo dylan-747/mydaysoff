@@ -4,6 +4,7 @@ import { getCultureEvents } from "./sources/cultureEvents.js";
 import { getTicketmasterEvents } from "./sources/ticketmasterEvents.js";
 import { getFeedRegistryEvents } from "./sources/feedRegistryEvents.js";
 import { getOpenActiveEvents } from "./sources/openActiveEvents.js";
+import { getShowcaseEvents } from "./sources/showcaseEvents.js";
 import { getPopularEventSeeds } from "./popularEvents.js";
 
 const DEFAULT_MIN_WEEKLY_EVENTS = 220;
@@ -365,7 +366,10 @@ export async function getCuratedEvents() {
   const includeSample = process.env.DEV_ALLOW_SAMPLE_EVENTS === "true";
   const liveOnly = process.env.LIVE_EVENTS_ONLY !== "false";
   const minWeeklyEvents = Number(process.env.MIN_WEEKLY_EVENTS || DEFAULT_MIN_WEEKLY_EVENTS);
-  const mergedReal = dedupeEvents([...feedRegistry, ...ticketmaster, ...openActive]);
+  // Curated showcase is a trusted baseline that always survives, so the map is
+  // never empty even when live feeds return nothing. Set SHOWCASE_EVENTS=false to disable.
+  const showcase = process.env.SHOWCASE_EVENTS === "false" ? [] : getShowcaseEvents();
+  const mergedReal = dedupeEvents([...showcase, ...feedRegistry, ...ticketmaster, ...openActive]);
 
   if (liveOnly) {
     const liveNearDays = Number(process.env.LIVE_NEAR_DAYS || 3);
@@ -402,7 +406,8 @@ export async function getCuratedEvents() {
       windowDays: Math.max(7, liveFutureWindowDays),
       maxTotal: Math.max(120, liveMaxTotal),
     });
-    return liveFutureBoosted.sort((a, b) => {
+    // Guarantee the curated showcase is always present, even if live caps trimmed it.
+    return dedupeEvents([...showcase, ...liveFutureBoosted]).sort((a, b) => {
       const dateCmp = String(a.start_date || "").localeCompare(String(b.start_date || ""));
       if (dateCmp !== 0) return dateCmp;
       return qualityScore(b) - qualityScore(a);

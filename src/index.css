@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-.selected-pin-icon {
-  filter: hue-rotate(165deg) saturate(2.2) brightness(1.02);
+.mdo-pin {
+  background: none;
+  border: none;
+}
+
+.mdo-pin svg {
+  filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.35));
+  transition: transform 0.12s ease;
+}
+
+.mdo-pin:hover svg {
+  transform: translateY(-2px) scale(1.04);
 }

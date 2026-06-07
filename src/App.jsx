@@ -1,70 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import MapView from "./MapView.jsx";
 import { getEvents, signupNewsletter, voteEvent } from "./lib/api.js";
+import { buildSampleEvents } from "./lib/sampleEvents.js";
 const EVENTS_CACHE_KEY = "mydaysoff_events_cache_v1";
-const todayYmd = new Date().toISOString().slice(0, 10);
-const fallbackEvents = [
-  {
-    id: "fallback_today_meetup",
-    name: "Community Coffee & Events Swap",
-    start_date: todayYmd,
-    end_date: todayYmd,
-    time: "17:30",
-    category: ["family", "wellbeing"],
-    cost: "free",
-    venue: "The Meadows",
-    city: "Edinburgh",
-    url: "#",
-    what3words: "stows.ages.take",
-    lat: 55.9412,
-    lng: -3.1932,
-    likes: 6,
-    source_trust: "sample",
-    verification_status: "unverified",
-    source_event_url: "",
-    source_feed_url: "",
-  },
-  {
-    id: "fallback_glasgow_market",
-    name: "Glasgow Riverside Street Food",
-    start_date: todayYmd,
-    end_date: todayYmd,
-    time: "13:00",
-    category: ["market", "family"],
-    cost: "free",
-    venue: "Riverside Museum",
-    city: "Glasgow",
-    url: "#",
-    what3words: "state.ramp.spice",
-    lat: 55.8653,
-    lng: -4.3052,
-    likes: 9,
-    source_trust: "sample",
-    verification_status: "unverified",
-    source_event_url: "",
-    source_feed_url: "",
-  },
-  {
-    id: "fallback_london_late",
-    name: "Southbank Late Open Arts",
-    start_date: todayYmd,
-    end_date: todayYmd,
-    time: "19:30",
-    category: ["music"],
-    cost: "paid",
-    venue: "Southbank Centre",
-    city: "London",
-    url: "#",
-    what3words: "cafe.robot.daring",
-    lat: 51.5058,
-    lng: -0.1169,
-    likes: 12,
-    source_trust: "sample",
-    verification_status: "unverified",
-    source_event_url: "",
-    source_feed_url: "",
-  },
-];
+const fallbackEvents = buildSampleEvents();
 
 const IconPin = (props) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -130,6 +69,11 @@ const COSTS = [
   { value: "donation", label: "Donation" },
 ];
 
+const TRUST_MODES = [
+  { value: "community", label: "Community-first" },
+  { value: "all", label: "All verified" },
+];
+
 const NEWSLETTER_INTERESTS = ["family", "outdoors", "market", "sports", "music", "charity", "wellbeing"];
 
 function addDays(d, n) {
@@ -139,7 +83,11 @@ function addDays(d, n) {
 }
 
 function ymd(d) {
-  return d.toISOString().slice(0, 10);
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const day = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function dayOffsetFromToday(dateStr) {
@@ -168,6 +116,42 @@ function inBounds(event, bounds) {
 
 function hasCoords(event) {
   return Number.isFinite(event?.lat) && Number.isFinite(event?.lng);
+}
+
+function hasUsableSource(event) {
+  const value = String(event?.source_event_url || event?.url || "").trim();
+  return /^https?:\/\//i.test(value);
+}
+
+function isPastEvent(event) {
+  const raw = String(event?.end_date || event?.start_date || "");
+  if (!raw) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(raw);
+  end.setHours(0, 0, 0, 0);
+  return Number.isFinite(end.valueOf()) && end < today;
+}
+
+function isCommunityAdjacent(event) {
+  const source = String(event?.source || "").toLowerCase();
+  const trust = String(event?.source_trust || "").toLowerCase();
+  const categories = (event?.category || []).map((item) => String(item).toLowerCase());
+  const name = String(event?.name || "").toLowerCase();
+  const venue = String(event?.venue || "").toLowerCase();
+
+  if (source.includes("user") || trust === "community") return true;
+  if (source.includes("ticketmaster")) return false;
+  if (name.startsWith("class les mills") || name.includes("hyrox")) return false;
+  if (categories.includes("family") || categories.includes("market") || categories.includes("charity") || categories.includes("outdoors")) return true;
+  if (venue.includes("library") || venue.includes("community") || venue.includes("museum")) return true;
+  return false;
+}
+
+function cityOptionsFromEvents(events) {
+  return Array.from(new Set(events.map((event) => String(event.city || "").trim()).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 80);
 }
 
 function distanceSq(a, b) {
@@ -204,6 +188,36 @@ function verificationLabel(status) {
   return "Unverified";
 }
 
+function sourceLabel(event) {
+  const source = String(event?.source || "").toLowerCase();
+  if (source.includes("user")) return "Community submitted";
+  if (source.includes("ticketmaster")) return "Ticketmaster";
+  if (source.includes("openactive")) return "OpenActive";
+  if (source.includes("civic")) return "Civic source";
+  if (source.includes("nhs")) return "NHS source";
+  return verificationLabel(event?.verification_status);
+}
+
+function displaySummary(event) {
+  const summary = String(event?.summary || "").trim();
+  if (!summary) return "";
+  if (/^(paid|free|donation-based|local)\s+(mixed|indoor|outdoor)?\s*(music|wellbeing|sports|family|market|charity|outdoors)/i.test(summary)) {
+    return "";
+  }
+  return summary;
+}
+
+function formatDateLabel(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return value;
+  return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatTimeLabel(value) {
+  return String(value || "").replace(/:00$/, "");
+}
+
 function apiErrorBannerText() {
   if (typeof window !== "undefined") {
     const host = window.location.hostname.toLowerCase();
@@ -219,6 +233,8 @@ export default function App() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [category, setCategory] = useState("");
   const [cost, setCost] = useState("");
+  const [city, setCity] = useState("");
+  const [trustMode, setTrustMode] = useState("all");
   const [heat, setHeat] = useState(false);
   const [events, setEvents] = useState([]);
   const [error, setError] = useState("");
@@ -236,18 +252,25 @@ export default function App() {
     interests: [],
   });
 
+  const cleanEvents = useMemo(
+    () => events.filter((event) => !isPastEvent(event) && hasCoords(event) && hasUsableSource(event)),
+    [events],
+  );
+
+  const cityOptions = useMemo(() => cityOptionsFromEvents(cleanEvents), [cleanEvents]);
+
   const rangeDays = useMemo(() => {
     const configured = Number(import.meta.env.VITE_CALENDAR_DAYS || 90);
     const maxDays = Number.isFinite(configured) ? Math.min(180, Math.max(14, configured)) : 90;
     let furthestEventOffset = 14;
-    for (const event of events) {
+    for (const event of cleanEvents) {
       const startOffset = dayOffsetFromToday(event?.start_date);
       const endOffset = dayOffsetFromToday(event?.end_date);
       if (Number.isFinite(startOffset)) furthestEventOffset = Math.max(furthestEventOffset, startOffset);
       if (Number.isFinite(endOffset)) furthestEventOffset = Math.max(furthestEventOffset, endOffset);
     }
     return Math.min(maxDays, Math.max(14, furthestEventOffset));
-  }, [events]);
+  }, [cleanEvents]);
 
   const days = useMemo(
     () => Array.from({ length: rangeDays + 1 }, (_, i) => addDays(today, i)),
@@ -263,7 +286,9 @@ export default function App() {
   async function loadEvents() {
     try {
       const data = await getEvents();
-      const nextEvents = data.events || [];
+      const liveEvents = data.events || [];
+      // Curated showcase set keeps the map alive when the live feed is thin/empty.
+      const nextEvents = liveEvents.length ? liveEvents : fallbackEvents;
       setEvents(nextEvents);
       setLastUpdatedAt(Date.now());
       try {
@@ -310,16 +335,23 @@ export default function App() {
   }, []);
 
   const dayFiltered = useMemo(() => {
-    let list = events.filter((e) => {
+    let list = cleanEvents.filter((e) => {
       const matchDate = within(selectedDate, e.start_date, e.end_date);
       const matchCat = !category || (e.category || []).includes(category);
       const matchCost = !cost || e.cost === cost;
-      return matchDate && matchCat && matchCost;
+      const matchCity = !city || String(e.city || "") === city;
+      const matchTrust = trustMode !== "community" || isCommunityAdjacent(e);
+      return matchDate && matchCat && matchCost && matchCity && matchTrust;
     });
 
     if (heat) list = [...list].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
     return list;
-  }, [events, selectedDate, category, cost, heat]);
+  }, [cleanEvents, selectedDate, category, cost, city, trustMode, heat]);
+
+  const todayCount = useMemo(
+    () => cleanEvents.filter((event) => within(today, event.start_date, event.end_date)).length,
+    [cleanEvents, today],
+  );
 
   const visibleEvents = useMemo(() => dayFiltered.filter((event) => inBounds(event, mapBounds)), [dayFiltered, mapBounds]);
   const listEvents = visibleEvents;
@@ -457,7 +489,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#eef6ff] text-[#14213d]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#14213d]">
       <header className="relative z-20">
         <div className="md:sticky md:top-0 md:z-30 bg-white/85 backdrop-blur border-b border-slate-200">
           <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
@@ -491,12 +523,47 @@ export default function App() {
         </div>
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 py-3 space-y-2 border-b border-slate-200 bg-white/70">
+        <div className="mx-auto max-w-7xl px-4 py-4 space-y-3 border-b border-slate-200 bg-white/70">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+            <p className="max-w-2xl text-sm text-slate-600">
+              Legit local things — markets, gigs, days out and community happenings — without trawling Facebook groups and Eventbrite.
+            </p>
+            <p className="shrink-0 text-sm font-semibold text-[#14213d]">
+              <span className="text-[#ff6a3d]">{todayCount}</span> on today
+              <span className="mx-1.5 text-slate-300">·</span>
+              <span className="text-slate-500">{cleanEvents.length} nearby this fortnight</span>
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <IconCalendar className="w-4 h-4 text-slate-500" />
-            <span className="text-sm font-medium">Date:</span>
-            <span className="text-sm text-slate-600">{selectedDate.toDateString()}</span>
+            <span className="text-sm font-medium">{selectedDate.toDateString()}</span>
             <IconFilter className="w-4 h-4 text-slate-500" />
+            <select
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+              value={trustMode}
+              onChange={(e) => setTrustMode(e.target.value)}
+              title="Trust lens"
+            >
+              {TRUST_MODES.map((mode) => (
+                <option key={mode.value} value={mode.value}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="max-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              title="City"
+            >
+              <option value="">Everywhere</option>
+              {cityOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
             <select
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
               value={category}
@@ -547,12 +614,10 @@ export default function App() {
               })}
             </div>
           </div>
-          <div className="text-xs text-slate-500">
-            Map-first mode: pan or zoom to any city and the sidebar follows. Feed auto-refreshes every minute.
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <span>Pan or zoom the map and the list follows. Showing current events with usable source links.</span>
+            {lastUpdatedAt && <span>Updated {new Date(lastUpdatedAt).toLocaleTimeString()}</span>}
           </div>
-          {lastUpdatedAt && (
-            <div className="text-[11px] text-slate-400">Last updated {new Date(lastUpdatedAt).toLocaleTimeString()}</div>
-          )}
         </div>
       </header>
 
@@ -562,8 +627,8 @@ export default function App() {
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-4 space-y-4">
-        <section className="relative rounded-3xl bg-white border border-slate-200 shadow-sm min-h-[360px] lg:min-h-[62vh]">
+      <main className="mx-auto grid max-w-7xl items-start gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <section className="relative min-h-[430px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-[186px] lg:min-h-[calc(100vh-220px)]">
           <div className="absolute top-3 left-3 inline-flex items-center gap-2 rounded-xl bg-white/90 border border-slate-200 px-3 py-1 text-xs shadow-sm z-[1000]">
             <IconPin className="w-4 h-4 text-[#ff6a3d]" />
             <span>
@@ -582,8 +647,9 @@ export default function App() {
           </div>
         </section>
 
-        {selectedEvent && (
-          <section className="relative overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
+        <div className="space-y-4">
+          {selectedEvent && (
+          <section className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff6a3d] via-[#ff8c6b] to-[#ff6a3d]" />
             <div className="flex items-start justify-between gap-3">
               <button
@@ -599,10 +665,11 @@ export default function App() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-xl font-bold">{selectedEvent.name}</h3>
                 <p className="text-sm text-slate-600 mt-1">
-                  {selectedEvent.start_date}
-                  {selectedEvent.time ? ` • ${selectedEvent.time}` : ""}
+                  {formatDateLabel(selectedEvent.start_date)}
+                  {selectedEvent.time ? ` • ${formatTimeLabel(selectedEvent.time)}` : ""}
                   {selectedEvent.venue ? ` • ${selectedEvent.venue}` : ""}
                 </p>
+                <p className="mt-1 text-xs font-semibold text-[#ff6a3d]">{sourceLabel(selectedEvent)} · {verificationLabel(selectedEvent.verification_status)}</p>
               </div>
 
               <button
@@ -624,7 +691,7 @@ export default function App() {
               </button>
             </div>
 
-            {selectedEvent.summary && <p className="mt-3 text-sm text-slate-700">{selectedEvent.summary}</p>}
+            {displaySummary(selectedEvent) && <p className="mt-3 text-sm text-slate-700">{displaySummary(selectedEvent)}</p>}
 
             <div className="mt-4 flex flex-wrap gap-2">
               {(selectedEvent.category?.length ? selectedEvent.category : ["community"]).map((c) => (
@@ -639,12 +706,6 @@ export default function App() {
                 <span className="text-xs rounded-full bg-amber-50 text-amber-700 px-2.5 py-1 lowercase">{formatLevel(selectedEvent.activity_level)}</span>
               )}
               <span className="text-xs rounded-full bg-fuchsia-50 text-fuchsia-700 px-2.5 py-1 lowercase">✨ {selectedEvent.vibe || "social"}</span>
-              {selectedEvent.source_trust && (
-                <span className="text-xs rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 lowercase">source: {selectedEvent.source_trust}</span>
-              )}
-              <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2.5 py-1 lowercase">
-                🔎 {verificationLabel(selectedEvent.verification_status)}
-              </span>
               {(selectedEvent.accessibility?.length ? selectedEvent.accessibility : ["check venue"]).map((tag) => (
                 <span key={`inline-${selectedEvent.id}-${tag}`} className="text-xs rounded-full bg-lime-50 text-lime-700 px-2.5 py-1 lowercase">
                   ♿ {tag}
@@ -693,11 +754,11 @@ export default function App() {
               </a>
             </div>
           </section>
-        )}
+          )}
 
-        <aside className="rounded-3xl bg-white border border-slate-200 shadow-sm p-3 lg:p-4">
+        <aside className="rounded-2xl bg-white border border-slate-200 shadow-sm p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold tracking-wide">Events</h2>
+            <h2 className="text-sm font-bold tracking-wide">Nearby now</h2>
             <span className="text-xs text-slate-500">{listEvents.length} shown</span>
           </div>
           <div className="space-y-2">
@@ -707,27 +768,35 @@ export default function App() {
               </div>
             )}
             {listEvents.length === 0 ? (
-              <div className="text-sm text-slate-500 p-3 border border-dashed rounded-xl">No events for this day.</div>
+              <div className="text-sm text-slate-500 p-3 border border-dashed rounded-xl">
+                {trustMode === "community"
+                  ? "No community-first picks for this day yet. Try All verified, another date, or submit something local."
+                  : "No events for this day."}
+              </div>
             ) : (
               listEvents.map((e) => (
                 <div
                   key={e.id}
                   onClick={() => selectEvent(e, { rebuildNav: true })}
-                  className="grid grid-cols-[1fr_auto] gap-3 items-start p-3 rounded-2xl border border-slate-200 hover:shadow-sm transition"
+                  className={[
+                    "grid cursor-pointer grid-cols-[1fr_auto] gap-3 items-start p-3 rounded-2xl border transition",
+                    selectedEvent?.id === e.id ? "border-[#ff6a3d]/50 bg-orange-50/50 shadow-sm" : "border-slate-200 hover:shadow-sm",
+                  ].join(" ")}
                 >
                   <div>
                     <h3 className="font-semibold leading-tight">{e.name}</h3>
                     <div className="mt-1 text-xs text-slate-600">
                       <span className="inline-flex items-center gap-1 mr-2">
                         <IconCalendar className="w-3 h-3" />
-                        {e.end_date && e.end_date !== e.start_date ? `${e.start_date} -> ${e.end_date}` : e.start_date}
+                        {e.end_date && e.end_date !== e.start_date ? `${formatDateLabel(e.start_date)} to ${formatDateLabel(e.end_date)}` : formatDateLabel(e.start_date)}
                       </span>
-                      {e.time && <span className="mr-2">- {e.time}</span>}
+                      {e.time && <span className="mr-2">- {formatTimeLabel(e.time)}</span>}
                       {e.venue && <span className="mr-2">- {e.venue}</span>}
                       {e.what3words && <span className="mr-2">- ///{e.what3words}</span>}
                     </div>
-                    {e.summary && <p className="mt-1 text-xs text-slate-600">{e.summary}</p>}
-                    <div className="mt-2 flex flex-wrap gap-1">
+                    {displaySummary(e) && <p className="mt-1 text-xs text-slate-600">{displaySummary(e)}</p>}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="text-[10px] rounded-full bg-[#ff6a3d]/10 text-[#b9401f] px-2 py-0.5 lowercase">{sourceLabel(e)}</span>
                       <span className="text-[10px] rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 lowercase">{e.city}</span>
                       {(e.category?.length ? e.category : ["community"]).map((c) => (
                         <span key={c} className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
@@ -741,26 +810,7 @@ export default function App() {
                         <span className="text-[10px] rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 lowercase">{formatLevel(e.activity_level)}</span>
                       )}
                       <span className="text-[10px] rounded-full bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 lowercase">✨ {e.vibe || "social"}</span>
-                      <span className="text-[10px] rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 lowercase">
-                        🔎 {verificationLabel(e.verification_status)}
-                      </span>
-                      <span className="text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 lowercase">source: {e.source_trust || "trusted-partner"}</span>
-                      <span className="text-[10px] rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 lowercase">
-                        {formatAudience(e.audience?.length ? e.audience : ["all-ages"])}
-                      </span>
-                      {(e.accessibility?.length ? e.accessibility : ["check venue"]).slice(0, 2).map((tag) => (
-                        <span key={`${e.id}-${tag}`} className="text-[10px] rounded-full bg-lime-50 text-lime-700 px-2 py-0.5 lowercase">
-                          ♿ {tag}
-                        </span>
-                      ))}
                     </div>
-                    {(e.planning?.public_transport || e.planning?.bring_with_you) && (
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        {e.planning?.public_transport ? `🚆 ${e.planning.public_transport}` : ""}
-                        {e.planning?.public_transport && e.planning?.bring_with_you ? " • " : ""}
-                        {e.planning?.bring_with_you ? `🎒 ${e.planning.bring_with_you}` : ""}
-                      </p>
-                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -789,6 +839,7 @@ export default function App() {
             )}
           </div>
         </aside>
+        </div>
       </main>
 
       <footer className="px-4 py-6">
