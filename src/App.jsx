@@ -489,9 +489,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f7fb] text-[#14213d]">
-      <header className="relative z-20">
-        <div className="md:sticky md:top-0 md:z-30 bg-white/85 backdrop-blur border-b border-slate-200">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#14213d] lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
+      <div className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200">
           <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <a href="#/" className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-slate-100 transition">
@@ -521,8 +520,9 @@ export default function App() {
               </button>
           </nav>
         </div>
-        </div>
+      </div>
 
+      <header className="relative z-20">
         <div className="mx-auto max-w-7xl px-4 py-4 space-y-3 border-b border-slate-200 bg-white/70">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
             <p className="max-w-2xl text-sm text-slate-600">
@@ -627,8 +627,8 @@ export default function App() {
         </div>
       )}
 
-      <main className="mx-auto grid max-w-7xl items-start gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="relative min-h-[430px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-[186px] lg:min-h-[calc(100vh-220px)]">
+      <main className="mx-auto grid w-full max-w-7xl items-start gap-4 px-4 py-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <section className="relative min-h-[430px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:h-full lg:min-h-0">
           <div className="absolute top-3 left-3 inline-flex items-center gap-2 rounded-xl bg-white/90 border border-slate-200 px-3 py-1 text-xs shadow-sm z-[1000]">
             <IconPin className="w-4 h-4 text-[#ff6a3d]" />
             <span>
@@ -647,7 +647,7 @@ export default function App() {
           </div>
         </section>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           {selectedEvent && (
           <section className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff6a3d] via-[#ff8c6b] to-[#ff6a3d]" />
