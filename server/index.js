@@ -5,6 +5,7 @@ import cors from "cors";
 import Stripe from "stripe";
 import db from "./db.js";
 import { getCuratedEvents } from "./adapters/aggregateEvents.js";
+import { unsubscribeToken } from "./newsletter.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -661,6 +662,25 @@ app.post("/api/newsletter/unsubscribe", (req, res) => {
 
   unsubscribeNewsletterSubscriber.run(email);
   return res.json({ ok: true, email });
+});
+
+// One-click unsubscribe link used in newsletter emails (HMAC-verified, no login).
+app.get("/api/newsletter/unsubscribe", (req, res) => {
+  const email = cleanText(req.query.e || "").toLowerCase();
+  const token = String(req.query.t || "");
+  if (!email || token !== unsubscribeToken(email)) {
+    return res.status(400).send("This unsubscribe link is invalid or expired.");
+  }
+  unsubscribeNewsletterSubscriber.run(email);
+  const origin = process.env.APP_ORIGIN || "https://mydaysoff.co.uk";
+  res
+    .set("Content-Type", "text/html")
+    .send(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribed</title>` +
+        `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:80px auto;padding:0 16px;text-align:center;color:#14213d">` +
+        `<h2>You're unsubscribed</h2><p style="color:#475569">${email.replace(/[<>&"]/g, "")} won't get any more weekly picks. ` +
+        `Changed your mind? Re-join anytime at <a href="${origin}" style="color:#ff6a3d">My Days Off</a>.</p></div>`,
+    );
 });
 
 function requireAdmin(req, res, next) {

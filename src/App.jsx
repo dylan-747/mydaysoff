@@ -246,6 +246,8 @@ export default function App() {
   const [newsletterStatus, setNewsletterStatus] = useState("");
   const [newsletterBusy, setNewsletterBusy] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [geoStatus, setGeoStatus] = useState("");
   const [newsletterForm, setNewsletterForm] = useState({
     email: "",
     city: "",
@@ -433,6 +435,25 @@ export default function App() {
     }
   }
 
+  function locateMe() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoStatus("Location isn't available on this device.");
+      return;
+    }
+    setGeoStatus("Finding you…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCity("");
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() });
+        setGeoStatus("");
+      },
+      (err) => {
+        setGeoStatus(err.code === 1 ? "Location permission denied." : "Couldn't get your location.");
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  }
+
   function openNewsletter() {
     setNewsletterStatus("");
     setNewsletterOpen(true);
@@ -581,10 +602,19 @@ export default function App() {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={locateMe}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
+              title="Centre the map on your location"
+            >
+              <IconPin className="w-4 h-4 text-[#ff6a3d]" /> Near me
+            </button>
             <label className="inline-flex items-center gap-1.5 text-sm select-none">
               <input type="checkbox" className="rounded" checked={heat} onChange={(e) => setHeat(e.target.checked)} />
               <IconFlame className="w-4 h-4 text-orange-500" /> Hottest first
             </label>
+            {geoStatus && <span className="text-xs text-slate-500">{geoStatus}</span>}
           </div>
           <div className="overflow-x-auto overscroll-x-contain touch-pan-x" style={{ WebkitOverflowScrolling: "touch" }}>
             <div className="flex gap-2 pb-1 min-w-max">
@@ -638,6 +668,7 @@ export default function App() {
               focusEventId={focusedEventId}
               selectedEventId={selectedEvent?.id || null}
               onEventSelect={(event) => selectEvent(event, { rebuildNav: true })}
+              centerOn={userLocation}
             />
           </div>
         </section>

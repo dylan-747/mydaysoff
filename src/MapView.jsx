@@ -46,11 +46,12 @@ function clusterIcon(count) {
   });
 }
 
-export default function MapView({ events = [], heatMode = false, onBoundsChange, focusEventId, selectedEventId, onEventSelect }) {
+export default function MapView({ events = [], heatMode = false, onBoundsChange, focusEventId, selectedEventId, onEventSelect, centerOn }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const markerByIdRef = useRef({});
+  const userMarkerRef = useRef(null);
   const didInitialFitRef = useRef(false);
   // keep latest props available to map-event listeners without re-binding them
   const stateRef = useRef({});
@@ -168,6 +169,26 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
     }
     renderMarkers();
   }, [events, heatMode, selectedEventId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !centerOn || !Number.isFinite(centerOn.lat) || !Number.isFinite(centerOn.lng)) return;
+
+    const here = [centerOn.lat, centerOn.lng];
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng(here);
+    } else {
+      userMarkerRef.current = L.circleMarker(here, {
+        radius: 7,
+        color: "#ffffff",
+        weight: 3,
+        fillColor: "#10b981",
+        fillOpacity: 1,
+      }).addTo(map);
+      userMarkerRef.current.bindTooltip("You're here", { direction: "top" });
+    }
+    map.flyTo(here, Math.max(map.getZoom(), 12), { duration: 0.6 });
+  }, [centerOn]);
 
   useEffect(() => {
     if (!focusEventId) return;
