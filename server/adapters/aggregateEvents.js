@@ -42,7 +42,7 @@ function hasGoodUrl(url) {
 // this entirely.
 const COMMERCIAL_VENUE = /(theatre|arena|\bo2\b|the\s+sse|hydro|lyceum|criterion|vaudeville|lyric|palladium|hippodrome|playhouse|co-?op\s*live|copper\s*box|\britz\b|academy|apollo|\bforum\b|stadium|wembley|usher hall|royal albert)/i;
 const NOISE_NAME = /(les mills|hyrox|swimfit|\bswim\b|aqua|aerobic|bootcamp|cardio|\bspin\b|circuit|pilates|body\s?pump|body\s?combat|zumba|group cycle|\bgym\b|\bclass(es)?\b|lane swim|workout|fitness|toddler session|junior session|soft play)/i;
-const COMMERCIAL_SHOW = /(the musical|\bmusical\b|wrestling|tribute|valorant|esports|stand-?up|comedy tour|on tour|live tour|\bpanto\b|west end)/i;
+const COMMERCIAL_SHOW = /(the musical|\bmusical\b|wrestling|tribute|valorant|esports|stand[\s-]?up|comedy club|comedy night|comedy tour|on tour|live tour|\bpanto\b|west end|presents|add[\s-]?ons?|\bvip\b|\bcamping\b|download festival|lido festival|latitude|trnsmt|parklife|creamfields|boardmasters|wireless festival|reading festival|leeds festival|isle of wight)/i;
 const LOCAL_POSITIVE = /(festival|\bmarket\b|\bfair\b|fayre|fete|gala|carnival|parade|fireworks|\bfood\b|street food|makers|\bcraft\b|farmers|vintage|flea|community|charity|fun day|family day|open day|ceilidh|picnic|beach clean|litter pick|\bwalk\b|nature|garden|heritage|museum late|repair caf|car boot|coffee morning|jumble|table top)/i;
 
 function isCommunityDayOut(event) {
