@@ -35,6 +35,33 @@ function hasGoodUrl(url) {
   return /^https?:\/\//i.test(value) && value !== "#";
 }
 
+// --- Community day-out filter ---------------------------------------------
+// Live feeds (Ticketmaster, OpenActive) are dominated by commercial arena/
+// theatre shows and leisure-centre gym timetables. We keep only events that
+// positively read as a local community day out. The curated showcase bypasses
+// this entirely.
+const COMMERCIAL_VENUE = /(theatre|arena|\bo2\b|the\s+sse|hydro|lyceum|criterion|vaudeville|lyric|palladium|hippodrome|playhouse|co-?op\s*live|copper\s*box|\britz\b|academy|apollo|\bforum\b|stadium|wembley|usher hall|royal albert)/i;
+const NOISE_NAME = /(les mills|hyrox|swimfit|\bswim\b|aqua|aerobic|bootcamp|cardio|\bspin\b|circuit|pilates|body\s?pump|body\s?combat|zumba|group cycle|\bgym\b|\bclass(es)?\b|lane swim|workout|fitness|toddler session|junior session|soft play)/i;
+const COMMERCIAL_SHOW = /(the musical|\bmusical\b|wrestling|tribute|valorant|esports|stand-?up|comedy tour|on tour|live tour|\bpanto\b|west end)/i;
+const LOCAL_POSITIVE = /(festival|\bmarket\b|\bfair\b|fayre|fete|gala|carnival|parade|fireworks|\bfood\b|street food|makers|\bcraft\b|farmers|vintage|flea|community|charity|fun day|family day|open day|ceilidh|picnic|beach clean|litter pick|\bwalk\b|nature|garden|heritage|museum late|repair caf|car boot|coffee morning|jumble|table top)/i;
+
+function isCommunityDayOut(event) {
+  const source = String(event?.source || "").toLowerCase();
+  if (source.includes("user") || source.includes("showcase")) return true;
+
+  const name = String(event?.name || "");
+  const venue = String(event?.venue || "");
+
+  // Commercial signals win over positive keywords (e.g. a "tribute festival"
+  // at a theatre is still commercial), so check these first.
+  if (COMMERCIAL_VENUE.test(venue)) return false;
+  if (NOISE_NAME.test(name)) return false;
+  if (COMMERCIAL_SHOW.test(name)) return false;
+
+  if (LOCAL_POSITIVE.test(`${name} ${venue}`)) return true;
+  return false; // default: drop ambiguous commercial/feed noise
+}
+
 function daysUntil(dateStr) {
   const raw = String(dateStr || "");
   if (!raw) return 365;
@@ -369,7 +396,10 @@ export async function getCuratedEvents() {
   // Curated showcase is a trusted baseline that always survives, so the map is
   // never empty even when live feeds return nothing. Set SHOWCASE_EVENTS=false to disable.
   const showcase = process.env.SHOWCASE_EVENTS === "false" ? [] : getShowcaseEvents();
-  const mergedReal = dedupeEvents([...showcase, ...feedRegistry, ...ticketmaster, ...openActive]);
+  const communityFilter = process.env.COMMUNITY_FILTER !== "false";
+  const liveRaw = [...feedRegistry, ...ticketmaster, ...openActive];
+  const liveFiltered = communityFilter ? liveRaw.filter(isCommunityDayOut) : liveRaw;
+  const mergedReal = dedupeEvents([...showcase, ...liveFiltered]);
 
   if (liveOnly) {
     const liveNearDays = Number(process.env.LIVE_NEAR_DAYS || 3);
