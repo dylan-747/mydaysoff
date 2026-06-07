@@ -30,6 +30,7 @@ export default function Submit() {
     booking_required: false,
     public_transport: "",
     bring_with_you: "",
+    website: "", // honeypot — must stay empty
   });
 
   function onChange(event) {
@@ -69,6 +70,12 @@ export default function Submit() {
       return;
     }
 
+    const link = form.url.trim();
+    if (!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(link)) {
+      setStatus("Please add a working link to the event (https://… — official page, Facebook event, or tickets).");
+      return;
+    }
+
     const lat = form.lat === "" ? null : Number(form.lat);
     const lng = form.lng === "" ? null : Number(form.lng);
     if ((lat !== null && !Number.isFinite(lat)) || (lng !== null && !Number.isFinite(lng))) {
@@ -87,7 +94,8 @@ export default function Submit() {
         cost: form.cost,
         venue: form.venue.trim(),
         city: form.city.trim() || "Edinburgh",
-        url: form.url.trim() || "#",
+        url: link,
+        website: form.website,
         what3words: form.what3words.trim().replace(/^\/{0,3}/, ""),
         lat: lat ?? 55.9533,
         lng: lng ?? -3.1883,
@@ -103,11 +111,7 @@ export default function Submit() {
         },
       });
 
-      if (response?.status === "approved") {
-        setStatus("Thanks. Your event is live now and marked user submitted.");
-      } else {
-        setStatus("Thanks. Your event is submitted for review and will go live once approved.");
-      }
+      setStatus(response?.message || "Thanks! Your event has been submitted and will appear shortly.");
       setForm({
         name: "",
         summary: "",
@@ -130,6 +134,7 @@ export default function Submit() {
         booking_required: false,
         public_transport: "",
         bring_with_you: "",
+        website: "",
       });
     } catch (err) {
       setStatus(err.message || "Could not submit event.");
@@ -153,6 +158,17 @@ export default function Submit() {
 
       <main className="max-w-3xl mx-auto p-4 md:p-6">
         <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4">
+          {/* Honeypot: hidden from people, bots tend to fill it. Must stay empty. */}
+          <input
+            type="text"
+            name="website"
+            value={form.website}
+            onChange={onChange}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
           <div className="grid md:grid-cols-2 gap-4">
             <label className="text-sm font-medium">Event name
               <input name="name" value={form.name} onChange={onChange} className="mt-1 w-full rounded-xl border px-3 py-2" />
@@ -266,8 +282,9 @@ export default function Submit() {
                 <button type="button" onClick={onResolveWords} className="rounded-xl border px-3 py-2 text-sm hover:bg-slate-50">Resolve</button>
               </div>
             </label>
-            <label className="text-sm font-medium">Event URL (optional)
-              <input name="url" value={form.url} onChange={onChange} placeholder="https://..." className="mt-1 w-full rounded-xl border px-3 py-2" />
+            <label className="text-sm font-medium">Event link (required)
+              <input name="url" value={form.url} onChange={onChange} required placeholder="https://..." className="mt-1 w-full rounded-xl border px-3 py-2" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">A page people can check — official site, Facebook event, or tickets. We verify it before publishing.</span>
             </label>
           </div>
 

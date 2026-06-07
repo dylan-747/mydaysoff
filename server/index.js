@@ -506,34 +506,120 @@ app.get("/api/events", (_req, res) => {
   return res.json(payload);
 });
 
+// --- Submission anti-spam ----------------------------------------------------
+// When true (default), clean submissions whose source link resolves are
+// auto-published in the background within seconds; only dead-link/suspicious
+// ones wait in the Admin queue. Set SUBMISSION_AUTO_PUBLISH=false to hold all.
+const submissionAutoPublish = process.env.SUBMISSION_AUTO_PUBLISH !== "false";
+const submissionRate = new Map(); // ip -> [timestamps]
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+const RATE_MAX_PER_HOUR = Number(process.env.SUBMISSION_RATE_PER_HOUR || 6);
+
+function submissionRateLimited(ip) {
+  const now = Date.now();
+  const recent = (submissionRate.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  recent.push(now);
+  submissionRate.set(ip, recent);
+  return recent.length > RATE_MAX_PER_HOUR;
+}
+
+const SPAM_WORDS = /\b(casino|viagra|cialis|porn|xxx|escort|bitcoin|crypto|forex|payday|nude|webcam|gambling|betting|pharmacy|cheap meds|weight ?loss|make money|earn \$|work from home|click here|buy now|limited offer)\b/gi;
+const URL_MATCH = /https?:\/\/[^\s]+/gi;
+
+function assessSubmissionSpam(payload) {
+  const name = String(payload.name || "").trim();
+  const text = `${name} ${String(payload.summary || "")}`;
+  const urlsInText = (text.match(URL_MATCH) || []).length;
+  const spamHits = (text.match(SPAM_WORDS) || []).length;
+  const nameIsUrl = /^https?:\/\//i.test(name);
+  const compact = name.replace(/\s/g, "");
+  const letters = (compact.match(/[a-z]/gi) || []).length;
+  const gibberish = compact.length >= 6 && letters / compact.length < 0.5;
+
+  if (nameIsUrl || urlsInText >= 2 || spamHits >= 2 || gibberish) return { ok: false };
+  return { ok: true, suspicious: spamHits >= 1 };
+}
+
 app.post("/api/events/submissions", (req, res) => {
   const payload = req.body || {};
-  if (!payload.name || !payload.start_date) {
-    return res.status(400).json({ error: "name and start_date are required" });
+
+  // 1) Honeypot: bots fill the hidden field. Pretend success, store nothing.
+  if (String(payload.website || "").trim() !== "") {
+    return res.status(201).json({ ok: true, status: "received" });
+  }
+
+  // 2) Required, sane fields.
+  const name = String(payload.name || "").trim();
+  if (name.length < 3 || name.length > 140) {
+    return res.status(400).json({ error: "Please add a clear event name." });
+  }
+  const startMs = new Date(payload.start_date).valueOf();
+  const todayMs = new Date(new Date().toISOString().slice(0, 10)).valueOf();
+  if (!Number.isFinite(startMs) || startMs < todayMs - 86400000 || startMs > todayMs + 120 * 86400000) {
+    return res.status(400).json({ error: "Start date must be a real date within the next few months." });
+  }
+
+  // 3) A real, resolving source link is required (also lets people verify it).
+  const link = String(payload.url || payload.source_event_url || "").trim();
+  if (!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(link)) {
+    return res.status(400).json({ error: "Please add a working link to the event (official page, Facebook event, or tickets)." });
+  }
+
+  // 4) Rate limit per IP.
+  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+  if (submissionRateLimited(ip)) {
+    return res.status(429).json({ error: "That's a lot of submissions in a short time — please try again later." });
+  }
+
+  // 5) Content/spam check.
+  const spam = assessSubmissionSpam(payload);
+  if (!spam.ok) {
+    return res.status(422).json({ error: "Sorry, we couldn't accept this submission." });
   }
 
   const event = toEventRow({
     ...payload,
+    url: link,
+    source_event_url: link,
     id: `user_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
-    status: autoApproveSubmissions ? "approved" : "pending",
+    status: "pending",
     source: "user",
     source_trust: "community",
     verification_status: "community-submitted",
     evidence: {
       publisher: "Community submission",
-      item_title: payload.name || "",
+      item_title: name,
       published_at: new Date().toISOString(),
     },
   });
 
   if (!Number.isFinite(event.lat) || !Number.isFinite(event.lng)) {
-    return res.status(400).json({ error: "lat/lng must be numbers" });
+    return res.status(400).json({ error: "Please add a location (what3words or lat/lng)." });
   }
 
   insertEvent.run(event);
   ensureVoteRow.run(event.id);
   eventsResponseCache = { builtAt: 0, payload: null };
-  return res.status(201).json({ ok: true, id: event.id, status: event.status });
+
+  // 6) Auto-publish clean submissions whose link resolves — no manual step.
+  //    Suspicious ones (a spam-ish keyword) stay pending for the Admin queue.
+  if (submissionAutoPublish && !spam.suspicious) {
+    fetchUrlStatus(link)
+      .then((result) => {
+        if (result.ok) {
+          db.prepare("UPDATE events SET status = 'approved' WHERE id = ? AND status = 'pending'").run(event.id);
+          eventsResponseCache = { builtAt: 0, payload: null };
+        }
+      })
+      .catch(() => {});
+  }
+
+  return res.status(201).json({
+    ok: true,
+    id: event.id,
+    status: "pending",
+    message: "Thanks! We're checking your link and your event will appear shortly.",
+  });
 });
 
 app.post("/api/events/:id/vote", (req, res) => {
