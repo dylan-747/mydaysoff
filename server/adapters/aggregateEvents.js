@@ -136,10 +136,21 @@ function mergeEvents(existing, event) {
   };
 }
 
+// Collapse near-identical event names (ticketing variants of the same thing),
+// e.g. "Cheese Festival 2026 Weekend Ticket" vs "Cheese Festival" -> same key.
+function canonicalName(name) {
+  return normalizeName(name)
+    .replace(/\b(weekend|day|saturday|sunday|early bird|standard|general admission|ga|vip|child|adult|family)\b/g, " ")
+    .replace(/\b(ticket|tickets|pass|passes|admission|entry|add on|add ons|addon|addons)\b/g, " ")
+    .replace(/\b\d{4}\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function dedupeEvents(events) {
   const map = new Map();
   for (const event of events) {
-    const key = `${normalizeCity(event.city)}|${String(event.start_date || "")}|${normalizeName(event.name)}|${normalizeVenue(event.venue)}`;
+    const key = `${normalizeCity(event.city)}|${String(event.start_date || "")}|${canonicalName(event.name)}|${normalizeVenue(event.venue)}`;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, event);

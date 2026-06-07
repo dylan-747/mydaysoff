@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 
 const DEFAULT_CENTER = [54.5, -2.2]; // UK view
 const DEFAULT_ZOOM = 6;
+const CLUSTER_CELL_PX = 64; // grid size for clustering overlapping pins
 
 function heatColor(votes) {
   if (votes >= 20) return "#dc2626";
@@ -35,12 +36,77 @@ function pinFor(votes, isSelected, heatMode) {
   });
 }
 
+function clusterIcon(count) {
+  const size = count >= 50 ? 52 : count >= 20 ? 46 : count >= 10 ? 40 : 34;
+  return L.divIcon({
+    className: "mdo-cluster",
+    html: `<div style="width:${size}px;height:${size}px;line-height:${size}px;">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 export default function MapView({ events = [], heatMode = false, onBoundsChange, focusEventId, selectedEventId, onEventSelect }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const markerByIdRef = useRef({});
   const didInitialFitRef = useRef(false);
+  // keep latest props available to map-event listeners without re-binding them
+  const stateRef = useRef({});
+  stateRef.current = { events, heatMode, selectedEventId, onEventSelect };
+
+  function renderMarkers() {
+    const map = mapRef.current;
+    const layer = layerRef.current;
+    if (!map || !layer) return;
+    const { events, heatMode, selectedEventId, onEventSelect } = stateRef.current;
+
+    layer.clearLayers();
+    markerByIdRef.current = {};
+
+    const pts = events.filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lng));
+    const selected = selectedEventId ? pts.find((e) => e.id === selectedEventId) : null;
+    const rest = selected ? pts.filter((e) => e.id !== selected.id) : pts;
+
+    const addSingle = (e) => {
+      const votes = Number(e.likes ?? 0);
+      const isSelected = selectedEventId && e.id === selectedEventId;
+      const marker = L.marker([e.lat, e.lng], {
+        icon: pinFor(votes, isSelected, heatMode),
+        zIndexOffset: isSelected ? 1000 : 0,
+        riseOnHover: true,
+      }).addTo(layer);
+      marker.on("click", () => onEventSelect?.(e));
+      markerByIdRef.current[e.id] = marker;
+    };
+
+    // group remaining points into grid cells (in screen space at current zoom)
+    const cells = new Map();
+    for (const e of rest) {
+      const p = map.latLngToLayerPoint([e.lat, e.lng]);
+      const key = `${Math.floor(p.x / CLUSTER_CELL_PX)}_${Math.floor(p.y / CLUSTER_CELL_PX)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(e);
+    }
+
+    for (const group of cells.values()) {
+      if (group.length === 1) {
+        addSingle(group[0]);
+        continue;
+      }
+      const lat = group.reduce((s, e) => s + e.lat, 0) / group.length;
+      const lng = group.reduce((s, e) => s + e.lng, 0) / group.length;
+      const cluster = L.marker([lat, lng], { icon: clusterIcon(group.length) }).addTo(layer);
+      cluster.on("click", () => {
+        const bounds = L.latLngBounds(group.map((e) => [e.lat, e.lng]));
+        map.flyToBounds(bounds.pad(0.35), { maxZoom: 14, duration: 0.4 });
+      });
+    }
+
+    // selected pin always rendered individually, on top
+    if (selected) addSingle(selected);
+  }
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -66,14 +132,19 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
         east: bounds.getEast(),
       });
     };
+    const onViewChange = () => {
+      emitBounds();
+      renderMarkers(); // re-cluster for the new zoom/position
+    };
 
-    map.on("moveend", emitBounds);
-    map.on("zoomend", emitBounds);
+    map.on("moveend", onViewChange);
+    map.on("zoomend", onViewChange);
     emitBounds();
+    renderMarkers();
 
     return () => {
-      map.off("moveend", emitBounds);
-      map.off("zoomend", emitBounds);
+      map.off("moveend", onViewChange);
+      map.off("zoomend", onViewChange);
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -84,33 +155,18 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
 
   useEffect(() => {
     const map = mapRef.current;
-    const layer = layerRef.current;
-    if (!map || !layer) return;
+    if (!map) return;
 
-    layer.clearLayers();
-    markerByIdRef.current = {};
     const pts = events.filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lng));
-    pts.forEach((e) => {
-      const votes = Number(e.likes ?? 0);
-      const isSelected = selectedEventId && e.id === selectedEventId;
-
-      const marker = L.marker([e.lat, e.lng], {
-        icon: pinFor(votes, isSelected, heatMode),
-        zIndexOffset: isSelected ? 1000 : 0,
-        riseOnHover: true,
-      }).addTo(layer);
-      marker.on("click", () => onEventSelect?.(e));
-      markerByIdRef.current[e.id] = marker;
-    });
-
     if (pts.length && !didInitialFitRef.current) {
-      const bounds = L.latLngBounds(pts.map(e => [e.lat, e.lng]));
+      const bounds = L.latLngBounds(pts.map((e) => [e.lat, e.lng]));
       map.fitBounds(bounds.pad(0.2));
       didInitialFitRef.current = true;
     } else if (!pts.length) {
       map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       didInitialFitRef.current = false;
     }
+    renderMarkers();
   }, [events, heatMode, selectedEventId]);
 
   useEffect(() => {
@@ -120,7 +176,7 @@ export default function MapView({ events = [], heatMode = false, onBoundsChange,
     if (!map || !marker) return;
 
     const latLng = marker.getLatLng();
-    map.flyTo(latLng, Math.max(map.getZoom(), 9), { duration: 0.5 });
+    map.flyTo(latLng, Math.max(map.getZoom(), 11), { duration: 0.5 });
   }, [focusEventId, events, heatMode, selectedEventId]);
 
   return <div ref={containerRef} className="absolute inset-0 rounded-3xl" />;

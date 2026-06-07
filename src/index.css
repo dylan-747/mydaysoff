@@ -15,3 +15,25 @@
 .mdo-pin:hover svg {
   transform: translateY(-2px) scale(1.04);
 }
+
+.mdo-cluster {
+  background: none;
+  border: none;
+}
+
+.mdo-cluster div {
+  background: #2563eb;
+  color: #fff;
+  border-radius: 9999px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.mdo-cluster:hover div {
+  transform: scale(1.06);
+}

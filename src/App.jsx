@@ -524,16 +524,11 @@ export default function App() {
 
       <header className="relative z-20">
         <div className="mx-auto max-w-7xl px-4 py-4 space-y-3 border-b border-slate-200 bg-white/70">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-            <p className="max-w-2xl text-sm text-slate-600">
-              Legit local things — markets, gigs, days out and community happenings — without trawling Facebook groups and Eventbrite.
-            </p>
-            <p className="shrink-0 text-sm font-semibold text-[#14213d]">
-              <span className="text-[#ff6a3d]">{todayCount}</span> on today
-              <span className="mx-1.5 text-slate-300">·</span>
-              <span className="text-slate-500">{cleanEvents.length} nearby this fortnight</span>
-            </p>
-          </div>
+          <p className="text-sm font-semibold text-[#14213d]">
+            <span className="text-[#ff6a3d]">{todayCount}</span> on today
+            <span className="mx-1.5 text-slate-300">·</span>
+            <span className="text-slate-500">{cleanEvents.length} nearby this fortnight</span>
+          </p>
 
           <div className="flex flex-wrap items-center gap-2">
             <IconCalendar className="w-4 h-4 text-slate-500" />
@@ -586,9 +581,9 @@ export default function App() {
                 </option>
               ))}
             </select>
-            <label className="inline-flex items-center gap-2 text-sm select-none">
+            <label className="inline-flex items-center gap-1.5 text-sm select-none">
               <input type="checkbox" className="rounded" checked={heat} onChange={(e) => setHeat(e.target.checked)} />
-              Sort by <IconFlame className="w-4 h-4 text-orange-500" />
+              <IconFlame className="w-4 h-4 text-orange-500" /> Hottest first
             </label>
           </div>
           <div className="overflow-x-auto overscroll-x-contain touch-pan-x" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -615,7 +610,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-            <span>Pan or zoom the map and the list follows. Showing current events with usable source links.</span>
+            <span>Pan or zoom the map — the list follows.</span>
             {lastUpdatedAt && <span>Updated {new Date(lastUpdatedAt).toLocaleTimeString()}</span>}
           </div>
         </div>
