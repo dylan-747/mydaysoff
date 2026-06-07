@@ -287,4 +287,10 @@ function seedIfNeeded() {
 
 seedIfNeeded();
 
+// Housekeeping: hide stray test submissions named "probe" (deploy-verification
+// artifacts from before the anti-spam gate). Idempotent and harmless to keep.
+db.prepare(
+  "UPDATE events SET status = 'rejected' WHERE source = 'user' AND lower(trim(name)) = 'probe' AND status != 'rejected'",
+).run();
+
 export default db;
