@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createCheckout, getEvents } from "../lib/api.js";
+import { getEvents, signupNewsletter } from "../lib/api.js";
 
 function isVerified(status) {
   return status === "feed-listing" || status === "ticketmaster-listing";
@@ -17,22 +17,20 @@ function isThisWeek(dateStr) {
 
 export default function About() {
   const [events, setEvents] = useState([]);
-  const [tour, setTour] = useState({ day: false, map: false, open: false });
+  const [email, setEmail] = useState("");
+  const [newsStatus, setNewsStatus] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
-
     async function load() {
       try {
         const data = await getEvents();
-        if (!active) return;
-        setEvents(data.events || []);
+        if (active) setEvents(data.events || []);
       } catch {
-        if (!active) return;
-        setEvents([]);
+        if (active) setEvents([]);
       }
     }
-
     load();
     return () => {
       active = false;
@@ -41,24 +39,30 @@ export default function About() {
 
   const stats = useMemo(() => {
     const cities = new Set(events.map((e) => (e.city || "").trim()).filter(Boolean));
-    const weekly = events.filter((e) => isThisWeek(e.start_date)).length;
-    const verified = events.filter((e) => isVerified(e.verification_status)).length;
     return {
       total: events.length,
       cities: cities.size,
-      weekly,
-      verified,
+      weekly: events.filter((e) => isThisWeek(e.start_date)).length,
+      verified: events.filter((e) => isVerified(e.verification_status)).length,
     };
   }, [events]);
 
-  const tourComplete = Object.values(tour).every(Boolean);
-
-  async function handleStartTrial() {
+  async function joinNewsletter(event) {
+    event.preventDefault();
+    const value = email.trim().toLowerCase();
+    if (!value || !value.includes("@")) {
+      setNewsStatus("Please add a valid email.");
+      return;
+    }
+    setBusy(true);
     try {
-      const data = await createCheckout(window.location.origin);
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
-    } catch {
-      // Keep About page calm: no inline error banner here.
+      await signupNewsletter({ email: value, city: "", interests: [] });
+      setNewsStatus("Joined — you're on the weekly local picks list.");
+      setEmail("");
+    } catch (err) {
+      setNewsStatus(err.message || "Could not save right now. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -75,7 +79,7 @@ export default function About() {
             </div>
             <div>
               <h1 className="text-lg font-bold leading-tight">My Days Off</h1>
-              <p className="text-xs text-slate-500 -mt-0.5">Community powered</p>
+              <p className="text-xs text-slate-500 -mt-0.5">Discover what&apos;s on near you</p>
             </div>
           </a>
           <nav className="flex items-center gap-2">
@@ -87,20 +91,21 @@ export default function About() {
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6">
-          <h2 className="text-2xl font-bold">Find what is genuinely worth your time.</h2>
+          <h2 className="text-2xl font-bold">Find the local things worth your day off.</h2>
           <p className="mt-3 text-slate-700 leading-relaxed">
-            My Days Off is a map-based event browser for UK events. It combines curated source data and moderated
-            community submissions so you can see what is happening, where it is, and whether it fits your day.
+            My Days Off is a map of genuinely local things to do — markets, gigs, days out, community happenings,
+            weekly staples like parkrun, and free places like museums and parks. No trawling Facebook groups or
+            ticketing sites. It&apos;s free to browse, and anyone can add an event.
           </p>
         </section>
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
-            <p className="text-xs text-slate-500">Events this week</p>
+            <p className="text-xs text-slate-500">Things on this week</p>
             <p className="text-2xl font-bold mt-1">{stats.weekly}</p>
           </div>
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
-            <p className="text-xs text-slate-500">Cities active</p>
+            <p className="text-xs text-slate-500">Towns &amp; cities</p>
             <p className="text-2xl font-bold mt-1">{stats.cities}</p>
           </div>
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
@@ -108,89 +113,93 @@ export default function About() {
             <p className="text-2xl font-bold mt-1">{stats.verified}</p>
           </div>
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
-            <p className="text-xs text-slate-500">Total events</p>
+            <p className="text-xs text-slate-500">Things to do</p>
             <p className="text-2xl font-bold mt-1">{stats.total}</p>
           </div>
         </section>
 
         <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="text-xl font-semibold">Try it in 20 seconds</h3>
-            <a href="#/" className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 hover:bg-slate-50">
-              Open map
-            </a>
+          <h3 className="text-xl font-semibold">How to use it</h3>
+          <div className="mt-4 grid md:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+              <p className="font-semibold">1 · Pick a day</p>
+              <p className="mt-1 text-slate-600">Scroll the date strip to today or any day ahead.</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+              <p className="font-semibold">2 · Find your area</p>
+              <p className="mt-1 text-slate-600">Tap “Near me”, or pan and zoom — the list follows the map.</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+              <p className="font-semibold">3 · Open &amp; go</p>
+              <p className="mt-1 text-slate-600">Check the source link, save a fire vote, head out.</p>
+            </div>
           </div>
-          <p className="mt-2 text-sm text-slate-600">Complete these steps once and you have the full product flow.</p>
-
-          <div className="mt-4 grid md:grid-cols-3 gap-3">
-            <label className="rounded-xl border border-slate-200 p-3 bg-slate-50/40 text-sm flex items-center gap-2">
-              <input type="checkbox" checked={tour.day} onChange={() => setTour((t) => ({ ...t, day: !t.day }))} />
-              Pick a day
-            </label>
-            <label className="rounded-xl border border-slate-200 p-3 bg-slate-50/40 text-sm flex items-center gap-2">
-              <input type="checkbox" checked={tour.map} onChange={() => setTour((t) => ({ ...t, map: !t.map }))} />
-              Move map to your city
-            </label>
-            <label className="rounded-xl border border-slate-200 p-3 bg-slate-50/40 text-sm flex items-center gap-2">
-              <input type="checkbox" checked={tour.open} onChange={() => setTour((t) => ({ ...t, open: !t.open }))} />
-              Open an event and tap fire
-            </label>
-          </div>
-
-          <p className="mt-3 text-sm text-slate-700">Status: {tourComplete ? "Complete" : "In progress"}</p>
+          <a href="#/" className="mt-4 inline-block rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 hover:bg-slate-50">
+            Open the map
+          </a>
         </section>
 
         <section className="grid md:grid-cols-2 gap-4">
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="font-semibold text-lg">What this is</h3>
+            <h3 className="font-semibold text-lg">What&apos;s on it</h3>
             <p className="mt-2 text-sm text-slate-700">
-              A map-first event browser focused on practical decisions. It is designed to help people answer quickly:
-              what is on, where it is, and whether it suits the day.
+              Markets, gigs, family days, festivals and community happenings — plus dependable weekly staples
+              (parkruns, library storytimes) and always-free places like museums, galleries and parks.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="font-semibold text-lg">How it works</h3>
+            <h3 className="font-semibold text-lg">Always something on</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Events are filtered by date, map area, category, and cost. Fire votes add positive ranking signal,
-              and the map and list stay in sync as you move across locations.
+              Recurring staples and evergreen free places mean there&apos;s usually something good near you, even on a
+              quiet day. Filter by date, area, category and cost; fire votes surface what people love.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="font-semibold text-lg">Trust and quality</h3>
+            <h3 className="font-semibold text-lg">Add your event — free</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Data comes from trusted feeds where available plus user submissions. User submissions are held for
-              moderation before approval, and source links are shown so details can be checked quickly.
+              Anyone can submit a local event. Listings with a working link publish automatically within minutes;
+              spam is filtered out. Source links are always shown so anyone can check the details.
             </p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="font-semibold text-lg">Why it exists</h3>
             <p className="mt-2 text-sm text-slate-700">
-              Most people have limited free time and too much fragmented information. This service exists to reduce
-              planning friction and make days off easier to use well.
+              Most of us have limited free time and too much scattered information. My Days Off cuts the planning
+              friction so your days off are easier to actually enjoy.
             </p>
           </article>
         </section>
 
         <section className="rounded-3xl bg-[#14213d] text-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold">Become a local insider</h3>
+          <h3 className="text-xl font-semibold">Get weekly local picks</h3>
           <p className="mt-2 text-sm text-white/90">
-            First month free. Then £1/month. This supports feed quality, moderation, and ongoing improvements.
+            A short, free email each week with the best local things near you. No spam, unsubscribe any time.
           </p>
-          <p className="mt-2 text-xs text-white/75">
-            Live now: {stats.weekly} events this week across {stats.cities} cities.
-          </p>
-          <div className="mt-4 grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
+          <form onSubmit={joinNewsletter} className="mt-4 flex flex-col sm:flex-row gap-2 sm:max-w-md">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="flex-1 rounded-xl px-3 py-2 text-sm text-[#14213d]"
+              required
+            />
             <button
-              onClick={handleStartTrial}
-              className="w-full sm:w-auto rounded-xl px-3 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm hover:brightness-95 whitespace-nowrap"
+              type="submit"
+              disabled={busy}
+              className="rounded-xl px-4 py-2 text-sm font-semibold bg-[#ff6a3d] text-white shadow-sm hover:brightness-95 disabled:opacity-60 whitespace-nowrap"
             >
-              <span className="sm:hidden">Become insider</span>
-              <span className="hidden sm:inline">Become a local insider</span>
+              {busy ? "Joining…" : "Join the list"}
             </button>
-            <a href="#/" className="w-full sm:w-auto rounded-xl px-3 py-2 text-sm font-semibold border border-white/30 hover:bg-white/10 text-center">
-              Explore events
-            </a>
-          </div>
+          </form>
+          {newsStatus && <p className="mt-2 text-sm text-white/90">{newsStatus}</p>}
+          <p className="mt-3 text-xs text-white/70">
+            Prefer to add something?{" "}
+            <a href="#/submit" className="underline">
+              Submit an event
+            </a>{" "}
+            — it&apos;s free.
+          </p>
         </section>
       </main>
     </div>
