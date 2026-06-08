@@ -25,9 +25,17 @@ function near(base, seed) {
   return base + (j - 0.5) * 0.04;
 }
 
+const WINDOW_DAYS = 21; // how far ahead recurring/evergreen entries reach
+
+// days from today until the next given weekday (0=Sun … 6=Sat); 0 if today
+function nextDow(dow) {
+  const today = new Date().getDay();
+  return (dow - today + 7) % 7;
+}
+
 const RAW = [
   // ---- Edinburgh ----
-  { city: "Edinburgh", lat: 55.9533, lng: -3.1883, day: 0, time: "10:00",
+  { city: "Edinburgh", lat: 55.9533, lng: -3.1883, repeat: "weekly", dow: 0, time: "10:00",
     name: "Stockbridge Sunday Market", venue: "Saunders Street, Stockbridge",
     category: ["market", "family"], cost: "free", vibe: "relaxed", indoor: "outdoor",
     summary: "Street food, local makers and bakers along the Water of Leith.",
@@ -55,7 +63,7 @@ const RAW = [
     url: "https://www.greatergrassmarket.co.uk", likes: 23, trust: "community" },
 
   // ---- Glasgow ----
-  { city: "Glasgow", lat: 55.8642, lng: -4.2518, day: 0, time: "12:00",
+  { city: "Glasgow", lat: 55.8642, lng: -4.2518, repeat: "weekly", dow: 6, time: "12:00",
     name: "Barras Market Weekender", venue: "The Barras, Gallowgate",
     category: ["market", "family"], cost: "free", vibe: "lively", indoor: "mixed",
     summary: "Glasgow's iconic weekend market — vinyl, vintage and street food.",
@@ -274,7 +282,7 @@ const RAW = [
     activity_level: "low",
     summary: "Donation-based beach yoga as the sun comes up. Bring a mat.",
     url: "https://www.visitbrighton.com", likes: 22, trust: "community" },
-  { city: "London", lat: 51.5074, lng: -0.1278, day: 0, time: "11:00",
+  { city: "London", lat: 51.5074, lng: -0.1278, repeat: "weekly", dow: 0, time: "11:00",
     name: "Columbia Road Flower Market", venue: "Columbia Road, Bethnal Green",
     category: ["market", "family"], cost: "free", vibe: "lively", indoor: "outdoor",
     summary: "The famous Sunday flower market — go early, leave with a fern.",
@@ -294,46 +302,225 @@ const RAW = [
     category: ["market", "family"], cost: "free", vibe: "lively", indoor: "outdoor",
     summary: "Caribbean food, makers and vinyl in the heart of Brixton.",
     url: "https://www.brixtonmarket.net", likes: 30, trust: "community" },
+
+  // ===== WEEKLY parkruns — free, every Saturday 9am =====
+  { city: "Edinburgh", lat: 55.9558, lng: -3.1130, repeat: "weekly", dow: 6, time: "09:00",
+    name: "Portobello parkrun", venue: "Portobello Promenade",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free, friendly, timed 5k along the beach. Walk, jog or run — all welcome.",
+    url: "https://www.parkrun.org.uk/portobello", likes: 28, trust: "community" },
+  { city: "Glasgow", lat: 55.8270, lng: -4.3130, repeat: "weekly", dow: 6, time: "09:30",
+    name: "Pollok parkrun", venue: "Pollok Country Park",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k through the woods and parkland. Volunteers welcome too.",
+    url: "https://www.parkrun.org.uk/pollok", likes: 24, trust: "community" },
+  { city: "Dundee", lat: 56.4880, lng: -3.0300, repeat: "weekly", dow: 6, time: "09:30",
+    name: "Camperdown parkrun", venue: "Camperdown Country Park",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k in Dundee's biggest park. Family-friendly.",
+    url: "https://www.parkrun.org.uk/camperdown", likes: 14, trust: "community" },
+  { city: "Aberdeen", lat: 57.1440, lng: -2.1760, repeat: "weekly", dow: 6, time: "09:30",
+    name: "Hazlehead parkrun", venue: "Hazlehead Park",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k around Hazlehead's woods and gardens.",
+    url: "https://www.parkrun.org.uk/hazlehead", likes: 12, trust: "community" },
+  { city: "Inverness", lat: 57.4630, lng: -4.2410, repeat: "weekly", dow: 6, time: "09:30",
+    name: "Inverness parkrun", venue: "Bught Park",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k along the river Ness. All paces welcome.",
+    url: "https://www.parkrun.org.uk/inverness", likes: 11, trust: "community" },
+  { city: "Manchester", lat: 53.5350, lng: -2.2470, repeat: "weekly", dow: 6, time: "09:00",
+    name: "Heaton parkrun", venue: "Heaton Park",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k in one of Europe's biggest municipal parks.",
+    url: "https://www.parkrun.org.uk/heaton", likes: 22, trust: "community" },
+  { city: "Leeds", lat: 53.8090, lng: -1.5610, repeat: "weekly", dow: 6, time: "09:00",
+    name: "Woodhouse Moor parkrun", venue: "Woodhouse Moor",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k just north of the city centre.",
+    url: "https://www.parkrun.org.uk/woodhousemoor", likes: 16, trust: "community" },
+  { city: "Bristol", lat: 51.4490, lng: -2.6300, repeat: "weekly", dow: 6, time: "09:00",
+    name: "Ashton Court parkrun", venue: "Ashton Court Estate",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free weekly 5k through a deer park with city views.",
+    url: "https://www.parkrun.org.uk/ashtoncourt", likes: 18, trust: "community" },
+  { city: "London", lat: 51.5610, lng: -0.1630, repeat: "weekly", dow: 6, time: "09:00",
+    name: "Hampstead Heath parkrun", venue: "Hampstead Heath",
+    category: ["sports", "outdoors"], cost: "free", vibe: "energetic", indoor: "outdoor", activity_level: "high",
+    summary: "Free, hilly weekly 5k across the Heath. Earn that coffee.",
+    url: "https://www.parkrun.org.uk/hampsteadheath", likes: 26, trust: "community" },
+
+  // ===== WEEKLY community staples =====
+  { city: "Edinburgh", lat: 55.9480, lng: -3.1900, repeat: "weekly", dow: 3, time: "10:30",
+    name: "Bounce & Rhyme Storytime", venue: "Central Library, George IV Bridge",
+    category: ["family"], cost: "free", vibe: "creative", indoor: "indoor", activity_level: "low",
+    summary: "Free songs, rhymes and stories for under-5s and their grown-ups.",
+    url: "https://www.edinburghlibraries.info", likes: 9, trust: "community" },
+  { city: "Glasgow", lat: 55.8625, lng: -4.2710, repeat: "weekly", dow: 2, time: "10:30",
+    name: "Toddler Tales at the Mitchell", venue: "The Mitchell Library",
+    category: ["family"], cost: "free", vibe: "creative", indoor: "indoor", activity_level: "low",
+    summary: "Free weekly story and song session for toddlers.",
+    url: "https://www.glasgowlife.org.uk/libraries", likes: 8, trust: "community" },
+  { city: "Stirling", lat: 56.1180, lng: -3.9360, repeat: "weekly", dow: 0, time: "10:00",
+    name: "Stirling Sunday Market", venue: "Port Street",
+    category: ["market", "family"], cost: "free", vibe: "relaxed", indoor: "outdoor",
+    summary: "Weekly street market — produce, crafts and street food.",
+    url: "https://www.yourstirling.com", likes: 10, trust: "community" },
+  { city: "Edinburgh", lat: 55.9760, lng: -3.1700, repeat: "weekly", dow: 6, time: "10:00",
+    name: "Leith Saturday Market", venue: "Dock Place, Leith",
+    category: ["market", "family"], cost: "free", vibe: "relaxed", indoor: "outdoor",
+    summary: "Weekly waterside market with food stalls and local makers.",
+    url: "https://www.leithmarket.com", likes: 17, trust: "community" },
+
+  // ===== EVERGREEN places — free & worth a visit any day =====
+  { city: "Edinburgh", lat: 55.9468, lng: -3.1903, evergreen: true, time: "10:00",
+    name: "National Museum of Scotland", venue: "Chambers Street",
+    category: ["family", "wellbeing"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free entry, open daily — dinosaurs, Dolly the sheep and a rooftop view.",
+    url: "https://www.nms.ac.uk/national-museum-of-scotland", likes: 40, trust: "official" },
+  { city: "Edinburgh", lat: 55.9510, lng: -3.1956, evergreen: true, time: "10:00",
+    name: "Scottish National Gallery", venue: "The Mound",
+    category: ["wellbeing", "family"], cost: "free", vibe: "calm", indoor: "indoor",
+    summary: "Free entry — Scotland's great art collection in the heart of the city.",
+    url: "https://www.nationalgalleries.org", likes: 19, trust: "official" },
+  { city: "Edinburgh", lat: 55.9650, lng: -3.2100, evergreen: true, time: "10:00",
+    name: "Royal Botanic Garden", venue: "Arboretum Place",
+    category: ["outdoors", "wellbeing", "family"], cost: "free", vibe: "calm", indoor: "outdoor",
+    summary: "70 acres of free gardens and glasshouses. Lovely any day off.",
+    url: "https://www.rbge.org.uk", likes: 23, trust: "official" },
+  { city: "Edinburgh", lat: 55.9550, lng: -3.1820, evergreen: true, time: "",
+    name: "Calton Hill", venue: "Calton Hill",
+    category: ["outdoors"], cost: "free", vibe: "relaxed", indoor: "outdoor", activity_level: "medium",
+    summary: "The best easy view in Edinburgh — monuments, sunset and the skyline.",
+    url: "https://www.edinburgh.org", likes: 21, trust: "official" },
+  { city: "Glasgow", lat: 55.8686, lng: -4.2906, evergreen: true, time: "10:00",
+    name: "Kelvingrove Art Gallery & Museum", venue: "Argyle Street",
+    category: ["family", "wellbeing"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free entry, open daily — Glasgow's beloved museum with daily organ recitals.",
+    url: "https://www.glasgowlife.org.uk/museums/venues/kelvingrove-art-gallery-and-museum", likes: 35, trust: "official" },
+  { city: "Glasgow", lat: 55.8656, lng: -4.3057, evergreen: true, time: "10:00",
+    name: "Riverside Museum", venue: "100 Pointhouse Place",
+    category: ["family"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free transport museum on the Clyde, plus the Tall Ship outside.",
+    url: "https://www.glasgowlife.org.uk/museums/venues/riverside-museum", likes: 20, trust: "official" },
+  { city: "Glasgow", lat: 55.8270, lng: -4.3170, evergreen: true, time: "",
+    name: "Pollok Country Park", venue: "2060 Pollokshaws Road",
+    category: ["outdoors", "family"], cost: "free", vibe: "calm", indoor: "outdoor", activity_level: "medium",
+    summary: "Highland cows, woodland trails and the Burrell Collection. Free.",
+    url: "https://www.glasgow.gov.uk", likes: 15, trust: "official" },
+  { city: "Falkirk", lat: 56.0194, lng: -3.7556, evergreen: true, time: "",
+    name: "The Kelpies & Helix Park", venue: "The Helix",
+    category: ["outdoors", "family"], cost: "free", vibe: "relaxed", indoor: "outdoor",
+    summary: "The 30m horse-head sculptures and a big free family park. Open all hours.",
+    url: "https://www.thehelix.co.uk", likes: 25, trust: "official" },
+  { city: "London", lat: 51.5194, lng: -0.1270, evergreen: true, time: "10:00",
+    name: "The British Museum", venue: "Great Russell Street",
+    category: ["family", "wellbeing"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free entry — the Rosetta Stone, mummies and two million years of history.",
+    url: "https://www.britishmuseum.org", likes: 47, trust: "official" },
+  { city: "London", lat: 51.5076, lng: -0.0994, evergreen: true, time: "10:00",
+    name: "Tate Modern", venue: "Bankside",
+    category: ["wellbeing", "family"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free modern art in a former power station, with river views up top.",
+    url: "https://www.tate.org.uk/visit/tate-modern", likes: 34, trust: "official" },
+  { city: "London", lat: 51.4967, lng: -0.1764, evergreen: true, time: "10:00",
+    name: "Natural History Museum", venue: "Cromwell Road",
+    category: ["family"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free entry — the blue whale, dinosaurs and a wildlife garden.",
+    url: "https://www.nhm.ac.uk", likes: 45, trust: "official" },
+  { city: "Manchester", lat: 53.4775, lng: -2.2520, evergreen: true, time: "10:00",
+    name: "People's History Museum", venue: "Left Bank, Spinningfields",
+    category: ["family", "wellbeing"], cost: "free", vibe: "creative", indoor: "indoor",
+    summary: "Free museum of democracy, protest and everyday working life.",
+    url: "https://phm.org.uk", likes: 13, trust: "official" },
+
+  // ===== more one-offs for spread =====
+  { city: "Edinburgh", lat: 55.9521, lng: -3.1889, day: 7, time: "12:00",
+    name: "Grassmarket Summer Fair", venue: "Grassmarket",
+    category: ["market", "family"], cost: "free", vibe: "lively", indoor: "outdoor",
+    summary: "Crafts, food and live music under the castle for one day.",
+    url: "https://www.greatergrassmarket.co.uk", likes: 18, trust: "community" },
+  { city: "Glasgow", lat: 55.8580, lng: -4.2900, day: 9, time: "13:00",
+    name: "Merchant City Street Food Sunday", venue: "Candleriggs",
+    category: ["market", "family"], cost: "free", vibe: "lively", indoor: "outdoor",
+    summary: "Independent kitchens and live sets in the Merchant City.",
+    url: "https://www.merchantcityglasgow.com", likes: 21, trust: "community" },
+  { city: "Dundee", lat: 56.4620, lng: -2.9700, day: 13, time: "10:00",
+    name: "Broughty Ferry Beach Day", venue: "Broughty Ferry Beach",
+    category: ["outdoors", "family"], cost: "free", vibe: "relaxed", indoor: "outdoor",
+    summary: "Sandcastles, rockpools and the castle by the sea.",
+    url: "https://www.dundee.com", likes: 12, trust: "community" },
+  { city: "Newcastle", lat: 54.9700, lng: -1.6100, day: 11, time: "11:00",
+    name: "Ouseburn Makers' Market", venue: "Ouseburn Valley",
+    category: ["market", "family"], cost: "free", vibe: "lively", indoor: "mixed",
+    summary: "Makers, street food and city farm in Newcastle's creative valley.",
+    url: "https://www.ouseburn.co.uk", likes: 14, trust: "community" },
+  { city: "Liverpool", lat: 53.4010, lng: -2.9660, day: 15, time: "11:00",
+    name: "Lark Lane Vintage Market", venue: "Lark Lane",
+    category: ["market", "family"], cost: "free", vibe: "relaxed", indoor: "mixed",
+    summary: "Vintage, records and brunch near Sefton Park.",
+    url: "https://www.visitliverpool.com", likes: 13, trust: "community" },
 ];
 
 const W3W = ["spice.ramp.state", "stows.ages.take", "cafe.robot.daring", "led.gone.needs",
   "trip.tides.salt", "rock.faced.bands", "soft.melt.dined", "vase.curve.lined",
   "moss.lake.fern", "gull.tide.warm", "kiln.brick.song", "pier.salt.fair"];
 
+// Each RAW entry expands into one or more dated instances:
+//  - { day }              one-off on a fixed offset from today
+//  - { repeat:'weekly', dow }  every week on that weekday, across the window
+//  - { evergreen:true }   always-on place: one entry spanning the whole window
+function occurrences(e) {
+  if (e.evergreen) return [{ off: 0, span: WINDOW_DAYS, sfx: "ever" }];
+  if (e.repeat === "weekly") {
+    const out = [];
+    for (let k = 0, first = nextDow(e.dow); first + k * 7 <= WINDOW_DAYS; k += 1) {
+      out.push({ off: first + k * 7, span: 0, sfx: `w${k}` });
+    }
+    return out;
+  }
+  return [{ off: e.day || 0, span: 0, sfx: "d" }];
+}
+
 export function buildCuratedEvents() {
-  return RAW.map((e, i) => {
-    const start = addDaysYmd(e.day);
+  const events = [];
+  RAW.forEach((e, i) => {
     const community = e.trust === "community";
-    return {
-      id: `showcase_${i}_${e.city.toLowerCase().replace(/\s+/g, "")}`,
-      name: e.name,
-      start_date: start,
-      end_date: start,
-      time: e.time,
-      category: e.category,
-      cost: e.cost,
-      venue: e.venue,
-      city: e.city,
-      url: e.url,
-      source_event_url: e.url,
-      source_feed_url: "",
-      what3words: W3W[i % W3W.length],
-      lat: near(e.lat, i + 1),
-      lng: near(e.lng, i + 7),
-      summary: e.summary,
-      vibe: e.vibe,
-      indoor: e.indoor,
-      activity_level: e.activity_level || "low",
-      audience: ["all-ages"],
-      accessibility: ["step-free"],
-      source: "showcase",
-      source_trust: community ? "community" : "official",
-      verification_status: community ? "community-submitted" : "feed-listing",
-      likes: e.likes,
-      popularity: e.likes,
-      last_seen_at: new Date().toISOString(),
-    };
+    const citySlug = e.city.toLowerCase().replace(/\s+/g, "");
+    occurrences(e).forEach((o) => {
+      const start = addDaysYmd(o.off);
+      events.push({
+        id: `showcase_${i}_${citySlug}_${o.sfx}`,
+        name: e.name,
+        start_date: start,
+        end_date: o.span ? addDaysYmd(o.off + o.span) : start,
+        time: e.time,
+        category: e.category,
+        cost: e.cost,
+        venue: e.venue,
+        city: e.city,
+        url: e.url,
+        source_event_url: e.url,
+        source_feed_url: "",
+        what3words: W3W[i % W3W.length],
+        lat: near(e.lat, i + 1),
+        lng: near(e.lng, i + 7),
+        summary: e.summary,
+        vibe: e.vibe,
+        indoor: e.indoor,
+        activity_level: e.activity_level || "low",
+        audience: ["all-ages"],
+        accessibility: ["step-free"],
+        source: "showcase",
+        source_trust: community ? "community" : "official",
+        verification_status: community ? "community-submitted" : "feed-listing",
+        likes: e.likes,
+        popularity: e.likes,
+        last_seen_at: new Date().toISOString(),
+      });
+    });
   });
+  return events;
 }
 
 export default buildCuratedEvents;

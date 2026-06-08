@@ -218,6 +218,15 @@ function formatTimeLabel(value) {
   return String(value || "").replace(/:00$/, "");
 }
 
+// Evergreen "always-on" places are modelled with a long date span; show them as
+// ongoing rather than a misleading 3-week date range.
+function isOngoing(event) {
+  const start = new Date(event?.start_date);
+  const end = new Date(event?.end_date || event?.start_date);
+  if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) return false;
+  return (end.valueOf() - start.valueOf()) / (24 * 60 * 60 * 1000) >= 14;
+}
+
 function apiErrorBannerText() {
   if (typeof window !== "undefined") {
     const host = window.location.hostname.toLowerCase();
@@ -691,7 +700,7 @@ export default function App() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-xl font-bold">{selectedEvent.name}</h3>
                 <p className="text-sm text-slate-600 mt-1">
-                  {formatDateLabel(selectedEvent.start_date)}
+                  {isOngoing(selectedEvent) ? "Open most days" : formatDateLabel(selectedEvent.start_date)}
                   {selectedEvent.time ? ` • ${formatTimeLabel(selectedEvent.time)}` : ""}
                   {selectedEvent.venue ? ` • ${selectedEvent.venue}` : ""}
                 </p>
@@ -814,7 +823,11 @@ export default function App() {
                     <div className="mt-1 text-xs text-slate-600">
                       <span className="inline-flex items-center gap-1 mr-2">
                         <IconCalendar className="w-3 h-3" />
-                        {e.end_date && e.end_date !== e.start_date ? `${formatDateLabel(e.start_date)} to ${formatDateLabel(e.end_date)}` : formatDateLabel(e.start_date)}
+                        {isOngoing(e)
+                          ? "Open most days"
+                          : e.end_date && e.end_date !== e.start_date
+                            ? `${formatDateLabel(e.start_date)} to ${formatDateLabel(e.end_date)}`
+                            : formatDateLabel(e.start_date)}
                       </span>
                       {e.time && <span className="mr-2">- {formatTimeLabel(e.time)}</span>}
                       {e.venue && <span className="mr-2">- {e.venue}</span>}
