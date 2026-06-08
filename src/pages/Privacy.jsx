@@ -38,6 +38,14 @@ export default function Privacy() {
           </div>
 
           <div>
+            <h3 className="font-semibold text-base text-[#14213d]">Location</h3>
+            <p>
+              If you use “Near me”, your device location is used in your browser only to centre the map. It is not
+              stored or sent to us. When you submit an event, the map pin you set is saved as that event&apos;s location.
+            </p>
+          </div>
+
+          <div>
             <h3 className="font-semibold text-base text-[#14213d]">What we do not do</h3>
             <p>We do not sell your personal data. We do not use your email for unrelated third-party marketing.</p>
           </div>

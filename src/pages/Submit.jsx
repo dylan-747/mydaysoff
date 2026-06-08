@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { resolveWhat3Words, submitEvent } from "../lib/api.js";
+import LocationPicker from "../components/LocationPicker.jsx";
 
 const CATEGORIES = ["family", "outdoors", "market", "sports", "music", "charity", "wellbeing"];
 const COSTS = ["free", "paid", "donation"];
@@ -78,8 +79,8 @@ export default function Submit() {
 
     const lat = form.lat === "" ? null : Number(form.lat);
     const lng = form.lng === "" ? null : Number(form.lng);
-    if ((lat !== null && !Number.isFinite(lat)) || (lng !== null && !Number.isFinite(lng))) {
-      setStatus("Latitude and longitude must be valid numbers.");
+    if (lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setStatus("Please set the event location on the map.");
       return;
     }
 
@@ -97,8 +98,8 @@ export default function Submit() {
         url: link,
         website: form.website,
         what3words: form.what3words.trim().replace(/^\/{0,3}/, ""),
-        lat: lat ?? 55.9533,
-        lng: lng ?? -3.1883,
+        lat,
+        lng,
         indoor: form.indoor,
         activity_level: form.activity_level,
         vibe: form.vibe,
@@ -288,13 +289,14 @@ export default function Submit() {
             </label>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <label className="text-sm font-medium">Latitude (optional)
-              <input name="lat" value={form.lat} onChange={onChange} placeholder="55.9533" className="mt-1 w-full rounded-xl border px-3 py-2" />
-            </label>
-            <label className="text-sm font-medium">Longitude (optional)
-              <input name="lng" value={form.lng} onChange={onChange} placeholder="-3.1883" className="mt-1 w-full rounded-xl border px-3 py-2" />
-            </label>
+          <div>
+            <p className="text-sm font-medium">Location (required)</p>
+            <div className="mt-1">
+              <LocationPicker
+                value={form.lat !== "" && form.lng !== "" ? { lat: Number(form.lat), lng: Number(form.lng) } : null}
+                onChange={({ lat, lng }) => setForm((prev) => ({ ...prev, lat: String(lat), lng: String(lng) }))}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
